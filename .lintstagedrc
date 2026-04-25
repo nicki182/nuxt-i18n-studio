@@ -1,0 +1,10 @@
+{
+  "*.{vue,js,ts,mjs,cjs}": [
+    "oxlint --deny-warnings",
+    "eslint --fix",
+    "prettier --write"
+  ],
+  "*.{json,md,yml,yaml}": [
+    "prettier --write"
+  ]
+}

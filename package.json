@@ -1,0 +1,107 @@
+{
+  "name": "@nicki182/i18n-text",
+  "version": "0.0.1",
+  "description": "In-context i18n editor for Nuxt (toggle edit mode, click-to-edit, and PR-based workflow).",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "sideEffects": false,
+  "packageManager": "pnpm@10.32.0",
+  "author": "nicki182",
+  "keywords": [
+    "nuxt",
+    "nuxt-module",
+    "i18n",
+    "localization",
+    "translation",
+    "devtools",
+    "nitro"
+  ],
+  "homepage": "https://github.com/nicki182/i18n-text#readme",
+  "bugs": {
+    "url": "https://github.com/nicki182/i18n-text/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicki182/i18n-text.git"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.mts",
+      "import": "./dist/module.mjs"
+    }
+  },
+  "main": "./dist/module.mjs",
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/types.d.mts"
+      ]
+    }
+  },
+  "bin": {
+    "i18n-studio": "./dist/runtime/cli.js",
+    "i18n-studio-text": "./dist/runtime/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "nuxt": "^3.0.0 || ^4.0.0"
+  },
+  "workspaces": [
+    "playground"
+  ],
+  "scripts": {
+    "prepack": "nuxt-module-build build",
+    "dev": "pnpm run dev:prepare && nuxt dev playground",
+    "dev:build": "nuxt build playground",
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt prepare playground",
+    "lint:eslint": "eslint .",
+    "lint:oxlint": "oxlint .",
+    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "typecheck": "pnpm run test:types",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit",
+    "test:ci": "pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm run test",
+    "release": "pnpm run test:ci && pnpm run prepack && changelogen --release && npm publish && git push --follow-tags",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^4.4.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@nuxt/devtools": "^3.2.4",
+    "@nuxt/eslint": "1.15.2",
+    "@nuxt/eslint-config": "^1.15.2",
+    "@nuxt/icon": "2.2.1",
+    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/schema": "^4.4.2",
+    "@nuxt/test-utils": "^4.0.2",
+    "@types/node": "latest",
+    "changelogen": "^0.6.2",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^62.9.0",
+    "eslint-plugin-perfectionist": "^5.9.0",
+    "h3": "^1.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "nuxt": "^4.4.2",
+    "oxlint": "^1.61.0",
+    "prettier": "3.8.3",
+    "typescript": "~5.9.2",
+    "unbuild": "^3.6.1",
+    "vitest": "^4.1.4",
+    "vue-tsc": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1. Install pnpm FIRST
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10 # Matches your package.json
+
+      # 2. Then setup Node and cache pnpm
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (oxlint + eslint)
+        run: pnpm run lint
+
+      - name: Prettier (check)
+        run: pnpm run format:check
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Tests
+        run: pnpm run test
+
+      - name: Build module (sanity check)
+        run: pnpm run prepack
+
+      - name: Build playground (sanity check)
+        run: pnpm run dev:build
