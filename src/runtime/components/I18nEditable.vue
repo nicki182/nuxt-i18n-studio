@@ -4,67 +4,87 @@ import { defineComponent, cloneVNode, inject, type VNode, ref, onMounted, onUnmo
 export default defineComponent({
   name: 'I18nEditable',
   props: {
-    translationKey: { type: String, required: true }
+    translationKey: { type: String, required: true },
+    translatableAttrs: { type: String, default: '' } // JSON array of { attr, key }
   },
   setup(props, { slots }) {
     const isStudioActive = inject<{ value: boolean }>('i18n-studio-active')
     const openModal = inject<Function>('i18n-open-modal')
 
-    // We use a ref to grab the actual raw HTML element once it mounts
-    const elRef = ref<HTMLElement | null>(null)
+    const elRef = ref<HTMLElement | any>(null)
 
-    // The Ultimate Event Blocker
+    const getDOMElement = (): HTMLElement | null => {
+      const raw = elRef.value
+      if (!raw) return null
+      if (raw && typeof raw === 'object' && '$el' in raw) {
+        return raw.$el as HTMLElement
+      }
+      return raw as HTMLElement
+    }
+
+    const buildTranslations = (): { key: string; usages: string[] }[] => {
+      const map = new Map<string, Set<string>>()
+
+      // 1. Add attribute usages first (they take priority)
+      if (props.translatableAttrs) {
+        const attrList = JSON.parse(props.translatableAttrs) as { attr: string; key: string }[]
+        attrList.forEach(({ attr, key }) => {
+          if (!map.has(key)) map.set(key, new Set())
+          map.get(key)!.add(`attr:${attr}`)
+        })
+      }
+
+      // 2. Add text usages only if the key doesn't already have any attr usage
+      props.translationKey.split(',').filter(Boolean).forEach(k => {
+        if (!map.has(k)) {
+          // No attribute usage for this key yet, so add as plain text
+          map.set(k, new Set<string>())
+          map.get(k)!.add('text')
+        }
+        // If key already has attr usages, do nothing (skip text)
+      })
+
+      return Array.from(map.entries()).map(([key, usages]) => ({
+        key,
+        usages: Array.from(usages)
+      }))
+    }
+
     const blockAndOpen = (e: Event) => {
       if (!isStudioActive?.value) return
-
-      // 🛑 The "Wall": Kill the event immediately in the capture phase
       e.preventDefault()
       e.stopPropagation()
       e.stopImmediatePropagation()
-
-      // We block mousedown/up/submit, but we only open the modal on 'click'
       if (e.type === 'click') {
-        openModal?.(props.translationKey.split(','), e.currentTarget as HTMLElement)
+        const translations = buildTranslations()
+        openModal?.(translations, getDOMElement() || e.currentTarget as HTMLElement)
       }
     }
 
-    // Attach or remove native listeners
     const toggleListeners = (add: boolean) => {
-      const el = elRef.value
+      const el = getDOMElement()
       if (!el) return
-
       const method = add ? 'addEventListener' : 'removeEventListener'
-      // THIS is the magic bullet: { capture: true } ensures we run first
       const opts = { capture: true }
-
-      el[method]('click', blockAndOpen, opts)
-      el[method]('mousedown', blockAndOpen, opts)
-      el[method]('mouseup', blockAndOpen, opts)
-      el[method]('submit', blockAndOpen, opts)
+      ;['click', 'mousedown', 'mouseup', 'submit'].forEach(event => {
+        el[method](event, blockAndOpen, opts)
+      })
     }
 
-    // Watch for Studio Mode toggling (Ctrl+Shift+F)
-    watch(() => isStudioActive?.value, (active) => {
-      toggleListeners(!!active)
-    })
-
-    // Handle initial mount
-    onMounted(() => {
-      if (isStudioActive?.value) toggleListeners(true)
-    })
-
-    // Clean up when the component is destroyed
+    watch(() => isStudioActive?.value, (active) => toggleListeners(!!active))
+    onMounted(() => { if (isStudioActive?.value) toggleListeners(true) })
     onUnmounted(() => toggleListeners(false))
 
     return () => {
       const children = slots.default?.()
       if (!children || children.length === 0) return null
-
-      const vnode = children.find(n => n.type !== Symbol.for('v-fgt') && n.type !== Symbol.for('v-cmt')) as VNode
+      const vnode = children.find(
+        n => n.type !== Symbol.for('v-fgt') && n.type !== Symbol.for('v-cmt')
+      ) as VNode
       if (!vnode) return children
 
       return cloneVNode(vnode, {
-        ref: elRef, // 👈 Bind the DOM element to our ref
+        ref: elRef,
         'data-i18n-key': props.translationKey,
         class: [vnode.props?.class, 'i18n-studio-node'],
       })
@@ -74,16 +94,17 @@ export default defineComponent({
 </script>
 
 <style>
-/* Visual feedback for editable nodes */
 .i18n-studio-active .i18n-studio-node {
   outline: 1px dashed rgba(59, 130, 246, 0.4) !important;
   cursor: context-menu !important;
-  /* Prevent text highlighting while clicking */
   user-select: none !important;
 }
-
 .i18n-studio-active .i18n-studio-node:hover {
   outline: 2px solid #3b82f6 !important;
   background: rgba(59, 130, 246, 0.05) !important;
+}
+.i18n-frozen *:not(#i18n-studio-ui-root):not(#i18n-studio-ui-root *) {
+  animation-play-state: paused !important;
+  transition: none !important;
 }
 </style>

@@ -1,7 +1,19 @@
 {
   "home": {
-    "title": "test 5",
+    "title": "test 8",
     "description": "hi 6,{name}",
-    "button": "Click me 5"
+    "button": "Click me 5",
+    "inputPlaceholder": "Enter your name ",
+    "nested": {
+      "value": "This is a nested message 3",
+      "anotherValue": "Another nested message 2"
+    },
+    "text": {
+      "ariaLabel": "This is an aria label 2",
+      "label": "This is a text 1"
+    }
+  },
+  "toast": {
+    "message": "This is a toast message 8"
   }
 }
