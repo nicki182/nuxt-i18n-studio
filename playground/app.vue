@@ -2,7 +2,7 @@
   <div style="padding: 50px; font-family: sans-serif">
     <h1>{{ $t("home.title") }}</h1>
     <p>{{ $t("home.description", { name: "Nick" }) }}</p>
-    <button @click="testOnClick">{{ $t("home.button") }}</button>
+    <button style="cursor:not-allowed;" @click="testOnClick">{{ $t("home.button") }}</button>
   </div>
 </template>
 <script setup lang="ts">
