@@ -1,25 +1,41 @@
+import { useStudioState } from "../composables/useStudioState";
+
+// Keep these local to the file so they don't pollute the app
+let hasPatchedTimers = false;
+const pending = new Map<number, { cb: TimerHandler; args: unknown[] }>();
+const realTimeoutIds: number[] = [];
+let counter = 0;
+
 export default defineNuxtPlugin(() => {
-  // Ensure we are in the browser
-  if (!window || window.__i18nTimerPatchDone) return;
-  window.__i18nTimerPatchDone = true;
+  if (!window || hasPatchedTimers) return;
+  hasPatchedTimers = true;
 
-  window.__i18nStudioMode = false;
+  const { isStudioMode, freezeControls } = useStudioState();
 
-  const pending = new Map<number, { cb: TimerHandler; args: unknown[] }>();
-  const realTimeoutIds: number[] = [];
-  let counter = 0;
+  // Wire up the control functions so toggleMode() can call them
+  freezeControls.flush = () => {
+    pending.forEach(({ cb, args }) => {
+      if (typeof cb === "function") cb(...args);
+    });
+    pending.clear();
+  };
 
+  freezeControls.cancelAll = () => {
+    realTimeoutIds.forEach((id) => window.clearTimeout(id));
+    realTimeoutIds.length = 0;
+  };
+
+  // --- Patching Logic ---
   const origSetTimeout = window.setTimeout;
   const origSetInterval = window.setInterval;
   const origClearTimeout = window.clearTimeout;
 
-  // 1. Wrap the function and cast "as unknown as typeof window.setTimeout"
   window.setTimeout = function (
     cb: TimerHandler,
     delay?: number,
     ...args: unknown[]
   ) {
-    if (window.__i18nStudioMode) {
+    if (isStudioMode.value) {
       const id = ++counter;
       pending.set(id, { cb, args });
       return id;
@@ -29,13 +45,12 @@ export default defineNuxtPlugin(() => {
     return id;
   } as unknown as typeof window.setTimeout;
 
-  // 2. Same here for setInterval
   window.setInterval = function (
     cb: TimerHandler,
     delay?: number,
     ...args: unknown[]
   ) {
-    if (window.__i18nStudioMode) {
+    if (isStudioMode.value) {
       ++counter;
       return counter;
     }
@@ -44,7 +59,6 @@ export default defineNuxtPlugin(() => {
     return id;
   } as unknown as typeof window.setInterval;
 
-  // 3. Same here for clearTimeout
   window.clearTimeout = function (id?: number) {
     if (id !== undefined) {
       pending.delete(id);
@@ -53,19 +67,4 @@ export default defineNuxtPlugin(() => {
     }
     origClearTimeout(id);
   } as unknown as typeof window.clearTimeout;
-
-  window.__i18nCancelAllTimers = function () {
-    realTimeoutIds.forEach((id) => origClearTimeout(id));
-    realTimeoutIds.length = 0;
-  };
-
-  window.__i18nFlushTimers = function () {
-    pending.forEach(({ cb, args }) => {
-      // Execute only if it's actually a function
-      if (typeof cb === "function") {
-        cb(...args);
-      }
-    });
-    pending.clear();
-  };
 });

@@ -1,6 +1,8 @@
 <script lang="ts">
 import { cloneVNode } from "vue";
 
+import { useStudioState } from "../composables/useStudioState";
+
 export default defineComponent({
   name: "I18nEditable",
   props: {
@@ -8,7 +10,10 @@ export default defineComponent({
     translatableAttrs: { type: String, default: "" }, // JSON array of { attr, key }
   },
   setup(props, { slots }) {
-    const isStudioActive = inject<{ value: boolean }>("i18n-studio-active");
+    // 1. Use our internal singleton state instead of Nuxt injections
+    const { isStudioMode } = useStudioState();
+
+    // 2. Keep the openModal injection (since your UI component provides this)
     const openModal =
       inject<
         (
@@ -17,14 +22,16 @@ export default defineComponent({
         ) => void
       >("i18n-open-modal");
 
-    const elRef = ref<HTMLElement | null>(null);
+    const elRef = ref<HTMLElement | ComponentPublicInstance | null>(null);
 
     const getDOMElement = (): HTMLElement | null => {
       const raw = elRef.value;
       if (!raw) return null;
-      if (raw && typeof raw === "object" && "$el" in raw) {
+      // If it's a Vue component instance, extract the root DOM element
+      if ("$el" in raw) {
         return raw.$el as HTMLElement;
       }
+      // Otherwise it's already an HTMLElement
       return raw as HTMLElement;
     };
 
@@ -53,7 +60,6 @@ export default defineComponent({
             map.set(k, new Set<string>());
             map.get(k)!.add("text");
           }
-          // If key already has attr usages, do nothing (skip text)
         });
 
       return Array.from(map.entries()).map(([key, usages]) => ({
@@ -63,10 +69,13 @@ export default defineComponent({
     };
 
     const blockAndOpen = (e: Event) => {
-      if (!isStudioActive?.value) return;
+      // 3. Check our composable state
+      if (!isStudioMode.value) return;
+
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
+
       if (e.type === "click") {
         const translations = buildTranslations();
         openModal?.(
@@ -86,21 +95,26 @@ export default defineComponent({
       });
     };
 
+    // 4. Watch our composable state
     watch(
-      () => isStudioActive?.value,
+      () => isStudioMode.value,
       (active) => toggleListeners(!!active),
     );
+
     onMounted(() => {
-      if (isStudioActive?.value) toggleListeners(true);
+      if (isStudioMode.value) toggleListeners(true);
     });
+
     onUnmounted(() => toggleListeners(false));
 
     return () => {
       const children = slots.default?.();
       if (!children || children.length === 0) return null;
+
       const vnode = children.find(
         (n) => n.type !== Symbol.for("v-fgt") && n.type !== Symbol.for("v-cmt"),
       ) as VNode;
+
       if (!vnode) return children;
 
       return cloneVNode(vnode, {
