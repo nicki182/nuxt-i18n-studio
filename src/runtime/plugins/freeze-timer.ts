@@ -1,10 +1,11 @@
-// runtime/plugins/00.timer-freeze.ts
 export default defineNuxtPlugin(() => {
-  if (window.__i18nTimerPatchDone) return;
+  // Ensure we are in the browser
+  if (!window || window.__i18nTimerPatchDone) return;
   window.__i18nTimerPatchDone = true;
 
   window.__i18nStudioMode = false;
-  const pending = new Map();
+
+  const pending = new Map<number, { cb: TimerHandler; args: unknown[] }>();
   const realTimeoutIds: number[] = [];
   let counter = 0;
 
@@ -12,7 +13,12 @@ export default defineNuxtPlugin(() => {
   const origSetInterval = window.setInterval;
   const origClearTimeout = window.clearTimeout;
 
-  window.setTimeout = function (cb: Function, delay?: number, ...args: any[]) {
+  // 1. Wrap the function and cast "as unknown as typeof window.setTimeout"
+  window.setTimeout = function (
+    cb: TimerHandler,
+    delay?: number,
+    ...args: unknown[]
+  ) {
     if (window.__i18nStudioMode) {
       const id = ++counter;
       pending.set(id, { cb, args });
@@ -21,38 +27,44 @@ export default defineNuxtPlugin(() => {
     const id = origSetTimeout(cb, delay, ...args) as unknown as number;
     realTimeoutIds.push(id);
     return id;
-  } as any;
+  } as unknown as typeof window.setTimeout;
 
-  window.setInterval = function (cb: Function, delay?: number, ...args: any[]) {
+  // 2. Same here for setInterval
+  window.setInterval = function (
+    cb: TimerHandler,
+    delay?: number,
+    ...args: unknown[]
+  ) {
     if (window.__i18nStudioMode) {
       ++counter;
       return counter;
     }
     const id = origSetInterval(cb, delay, ...args) as unknown as number;
-    // we track it too, just in case
     realTimeoutIds.push(id);
     return id;
-  } as any;
+  } as unknown as typeof window.setInterval;
 
+  // 3. Same here for clearTimeout
   window.clearTimeout = function (id?: number) {
-    pending.delete(id!);
-    const idx = realTimeoutIds.indexOf(id!);
-    if (idx > -1) realTimeoutIds.splice(idx, 1);
+    if (id !== undefined) {
+      pending.delete(id);
+      const idx = realTimeoutIds.indexOf(id);
+      if (idx > -1) realTimeoutIds.splice(idx, 1);
+    }
     origClearTimeout(id);
-  } as any;
+  } as unknown as typeof window.clearTimeout;
 
-  // Cancel all real timeouts that are still pending
   window.__i18nCancelAllTimers = function () {
     realTimeoutIds.forEach((id) => origClearTimeout(id));
     realTimeoutIds.length = 0;
   };
 
-  // Flush (and discard) queued timeouts when unfreezing
   window.__i18nFlushTimers = function () {
     pending.forEach(({ cb, args }) => {
-      try {
+      // Execute only if it's actually a function
+      if (typeof cb === "function") {
         cb(...args);
-      } catch (e) {}
+      }
     });
     pending.clear();
   };

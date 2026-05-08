@@ -72,6 +72,8 @@
   },
   "dependencies": {
     "@nuxt/kit": "^4.4.2",
+    "nuxt-auth-utils": "^0.5.29",
+    "octokit": "^5.0.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

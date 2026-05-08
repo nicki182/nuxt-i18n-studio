@@ -1,11 +1,9 @@
 // @ts-check
-import { createConfigForNuxt } from "@nuxt/eslint-config/flat"
-
-import jsdoc from "eslint-plugin-jsdoc"
-import perfectionist from "eslint-plugin-perfectionist"
-
+import { createConfigForNuxt } from "@nuxt/eslint-config/flat";
 // This is a config (not a plugin). It turns off ESLint rules that conflict with Prettier.
-import eslintConfigPrettier from "eslint-config-prettier"
+import eslintConfigPrettier from "eslint-config-prettier";
+import jsdoc from "eslint-plugin-jsdoc";
+import perfectionist from "eslint-plugin-perfectionist";
 
 // Run `npx @eslint/config-inspector` to inspect the resolved config interactively
 export default createConfigForNuxt({
@@ -13,12 +11,12 @@ export default createConfigForNuxt({
     // Rules for module authors
     tooling: true,
     // Nuxt stylistic rules (not "Prettier", but consistent style rules)
-    stylistic: true
+    stylistic: true,
   },
   dirs: {
     // Nuxt ESLint will treat these as source dirs for module + playground
-    src: ["./src", "./playground"]
-  }
+    src: ["./src", "./playground"],
+  },
 })
   .append({
     name: "i18n-text/ignores",
@@ -27,19 +25,16 @@ export default createConfigForNuxt({
       "**/dist/**",
       "**/.output/**",
       "**/.nuxt/**",
-      "**/playwright-report/**"
-    ]
+      "**/playwright-report/**",
+    ],
   })
   .append({
     name: "i18n-text/plugins",
     plugins: {
       jsdoc,
-      perfectionist
+      perfectionist,
     },
     rules: {
-      // --- General project rules ---
-      "no-console": "error",
-
       // --- JSDoc (tune these to taste) ---
       // Start relatively light so it doesn't become annoying.
       "jsdoc/require-jsdoc": [
@@ -52,16 +47,16 @@ export default createConfigForNuxt({
             MethodDefinition: true,
             ClassDeclaration: true,
             ArrowFunctionExpression: false,
-            FunctionExpression: false
+            FunctionExpression: false,
           },
           contexts: [
             // Require docs for exported functions/classes in TS/JS
             "ExportNamedDeclaration > FunctionDeclaration",
             "ExportNamedDeclaration > ClassDeclaration",
             "ExportDefaultDeclaration > FunctionDeclaration",
-            "ExportDefaultDeclaration > ClassDeclaration"
-          ]
-        }
+            "ExportDefaultDeclaration > ClassDeclaration",
+          ],
+        },
       ],
       "jsdoc/require-param": "warn",
       "jsdoc/require-returns": "off", // many TS functions are self-explanatory; turn on later if you want
@@ -73,18 +68,9 @@ export default createConfigForNuxt({
         {
           type: "natural",
           order: "asc",
-          // helpful defaults to reduce churn
-          newlinesBetween: "always",
-          groups: [
-            "type",
-            ["builtin", "external"],
-            ["internal", "parent", "sibling", "index"],
-            "side-effect",
-            "object"
-          ]
-        }
+        },
       ],
-    }
+    },
   })
   // Disable rules that conflict with Prettier (recommended if you use Prettier)
-  .append(eslintConfigPrettier)
+  .append(eslintConfigPrettier);
