@@ -1,4 +1,6 @@
 // 1. Shared Global State (Singleton - defined outside the function)
+import { ref } from "vue";
+
 const isStudioMode = ref(false);
 const pageKeys = ref<string[]>([]);
 

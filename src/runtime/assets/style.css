@@ -1,0 +1,17 @@
+.i18n-studio-active [data-i18n-key] {
+  outline: 1px dashed rgba(59, 130, 246, 0.4) !important;
+  cursor: context-menu !important;
+  user-select: none !important;
+}
+
+.i18n-studio-active [data-i18n-key]:hover {
+  outline: 2px solid #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.05) !important;
+  cursor:pointer !important;
+}
+
+/* Freeze animations when Studio Mode is active */
+.i18n-frozen *:not(#i18n-studio-ui-root):not(#i18n-studio-ui-root *) {
+  animation-play-state: paused !important;
+  transition: none !important;
+}

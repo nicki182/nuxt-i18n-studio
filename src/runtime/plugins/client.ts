@@ -1,17 +1,10 @@
-import {
-  render,
-  h,
-  defineComponent,
-  ref,
-  reactive,
-  nextTick,
-  onMounted,
-} from "vue";
+import { render } from "vue";
 
+import type { FetchError } from "../types/error";
 import type { I18nInstance } from "../types/i18n";
 
 import GithubTokenModal from "../components/GithubTokenModal.vue";
-import I18nPageTranslations from "../components/I18nPageTranslationsModal.vue";
+import I18nPageTranslations from "../components/I18nPageTranslationsButton.vue";
 import StudioModal from "../components/StudioModal.vue";
 import StudioSaveBar from "../components/StudioSaveBar.vue";
 import { useStudioEffects } from "../composables/useStudioEffects";
@@ -24,23 +17,14 @@ export default defineNuxtPlugin((nuxtApp) => {
   const pendingChanges = ref<Record<string, string>>({});
   const isPublishing = ref(false);
   const isTokenModalOpen = ref(false);
-
+  const clearOtherLocales = ref(false);
+  const config = useRuntimeConfig().public.i18nStudio || {};
   const modalState = reactive({
     open: false,
     translations: [] as { key: string; usages: string[] }[],
     targetElement: null as HTMLElement | null | undefined,
     initialValues: {} as Record<string, string>,
   });
-
-  const resolveNestedKey = (obj: unknown, path: string): string => {
-    const value = path.split(".").reduce((acc: unknown, part: string) => {
-      if (acc && typeof acc === "object" && acc !== null) {
-        return (acc as Record<string, unknown>)[part];
-      }
-      return undefined;
-    }, obj);
-    return typeof value === "string" ? value : "";
-  };
 
   // ── PROVIDE FOR UI COMPONENTS ─────────────────────────────
   nuxtApp.vueApp.provide(
@@ -56,21 +40,50 @@ export default defineNuxtPlugin((nuxtApp) => {
       const initials: Record<string, string> = {};
 
       translations.forEach((t) => {
-        let currentVal = resolveNestedKey(messages, t.key);
+        let rawJsonVal = "";
 
+        // 1. Get the raw value from the i18n instance safely
+        const resolved = t.key.split(".").reduce((o: unknown, k: string) => {
+          // Safely traverse the object tree
+          if (o && typeof o === "object" && o !== null && k in o) {
+            return (o as Record<string, unknown>)[k];
+          }
+          return undefined;
+        }, messages);
+
+        // 2. Safely check the types of the resolved value
+        if (typeof resolved === "string") {
+          // It's a plain string
+          rawJsonVal = resolved;
+        } else if (
+          resolved !== null &&
+          typeof resolved === "object" &&
+          "loc" in resolved
+        ) {
+          // It's a Vue-i18n compiled message (Proxy/Function)
+          const compiledObj = resolved as { loc?: { source?: string } };
+          if (typeof compiledObj.loc?.source === "string") {
+            rawJsonVal = compiledObj.loc.source;
+          }
+        }
+
+        let fallbackDomVal = "";
         t.usages.forEach((u) => {
-          if (el) {
-            if (u === "text") {
-              const domVal = el.textContent?.trim();
-              if (domVal) currentVal = domVal;
-            } else if (u.startsWith("attr:")) {
-              const attrName = u.slice(5);
-              const domVal = el.getAttribute(attrName);
-              if (domVal) currentVal = domVal;
-            }
+          if (u === "text") {
+            const domVal = el?.textContent?.trim();
+            if (domVal) fallbackDomVal = domVal;
+          } else if (u.startsWith("attr:")) {
+            const attrName = u.slice(5);
+            const domVal = el?.getAttribute(attrName);
+            if (domVal) fallbackDomVal = domVal;
           }
         });
-        initials[t.key] = pendingChanges.value[t.key] ?? currentVal;
+
+        // 3. Assign the initial value (make sure to use .translations here since we restructured it!)
+        initials[t.key] =
+          pendingChanges.value.translations[t.key] ||
+          rawJsonVal ||
+          fallbackDomVal;
       });
 
       modalState.initialValues = initials;
@@ -85,9 +98,8 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   const StudioUI = defineComponent({
     setup() {
-      // Initialize our new composables!
-      const { githubToken, loadToken, saveToken, clearToken } =
-        useStudioToken();
+      // Initialize our new secure token composable!
+      const { isAuthenticated, checkAuth, login, logout } = useStudioToken();
 
       const { checkHmrAttached, markHmrAttached } = useStudioEffects(() => {
         // This fires automatically when Ctrl+Shift+F turns Studio off
@@ -96,11 +108,12 @@ export default defineNuxtPlugin((nuxtApp) => {
       });
 
       onMounted(() => {
-        loadToken();
+        // Check the server session cookie on mount
+        if (!import.meta.dev) checkAuth();
       });
 
       const handleSave = (vals: Record<string, string>) => {
-        Object.assign(pendingChanges.value, vals);
+        Object.assign(pendingChanges.value, { ...vals });
         const el = modalState.targetElement;
 
         modalState.translations.forEach((t) => {
@@ -119,14 +132,21 @@ export default defineNuxtPlugin((nuxtApp) => {
         modalState.open = false;
       };
 
-      const saveTokenAndPublish = (token: string) => {
-        saveToken(token);
-        isTokenModalOpen.value = false;
-        handlePublish();
+      const saveTokenAndPublish = async (token: string) => {
+        try {
+          // Attempt to login using the server endpoint
+          await login(token);
+          isTokenModalOpen.value = false;
+          handlePublish(clearOtherLocales.value);
+        } catch {
+          alert("Invalid GitHub Token. Please check your token and try again.");
+        }
       };
 
-      async function handlePublish() {
-        if (!githubToken.value) {
+      async function handlePublish(clearLocales: boolean) {
+        // 1. Check our boolean reactive state (managed by cookie check)
+        if (!isAuthenticated.value && !import.meta.dev) {
+          clearOtherLocales.value = clearLocales;
           isTokenModalOpen.value = true;
           return;
         }
@@ -135,15 +155,18 @@ export default defineNuxtPlugin((nuxtApp) => {
         const changesToApply = { ...pendingChanges.value };
         const i18n = (nuxtApp as unknown as { $i18n?: I18nInstance }).$i18n;
         const currentLocale = i18n?.locale?.value || "en";
-
         try {
+          // 2. We NO LONGER pass Authorization headers! The browser sends the secure cookie.
           const response = await $fetch<{
             success: boolean;
             json?: Record<string, unknown>;
           }>("/api/__i18n_studio/update", {
             method: "POST",
-            headers: { Authorization: `Bearer ${githubToken.value}` },
-            body: { updates: changesToApply, locale: currentLocale },
+            body: {
+              updates: changesToApply,
+              locale: currentLocale,
+              clearOtherLocales: clearLocales,
+            },
           });
 
           if (response.success && response.json && i18n) {
@@ -170,9 +193,14 @@ export default defineNuxtPlugin((nuxtApp) => {
         } catch (err: unknown) {
           const fetchError = err as FetchError;
           console.error("Publish failed:", fetchError);
+
           if (fetchError.response?.status === 401) {
-            clearToken();
-            alert("GitHub token is invalid or expired. Please try again.");
+            // 3. Clear the server session if unauthorized
+            logout();
+            alert(
+              "Your GitHub token session expired or was rejected. Please authenticate again.",
+            );
+            isTokenModalOpen.value = true; // Re-open the modal
           }
         } finally {
           isPublishing.value = false;
@@ -194,6 +222,8 @@ export default defineNuxtPlugin((nuxtApp) => {
           count: Object.keys(pendingChanges.value).length,
           loading: isPublishing.value,
           onPublish: handlePublish,
+          initialClearLocales: config.cleanOnValueChange,
+          isPublishingToGithub: !import.meta.dev, // Only show "to GitHub" in dev mode where the token modal is relevant
         }),
         h(I18nPageTranslations),
         h(GithubTokenModal, {

@@ -1,5 +1,3 @@
-import { defineEventHandler, readBody, createError } from "h3";
-
 export default defineEventHandler(async (event) => {
   const { token } = await readBody(event);
 

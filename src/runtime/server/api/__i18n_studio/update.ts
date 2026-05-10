@@ -56,7 +56,6 @@ export default defineEventHandler(async (event) => {
       ),
       content: targetUpdated,
     });
-
     // ── 2. DELETE FROM OTHER LOCALES (IF CHECKED) ─────────────
     if (body.clearOtherLocales) {
       const allFiles = await fs.readdir(localesDir);

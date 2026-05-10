@@ -1,31 +1,47 @@
 <template>
-  <Transition name="slide-up">
+  <Teleport to="body">
     <div v-if="count > 0" class="i18n-save-bar">
-      <div class="i18n-status">
-        <span class="i18n-pulse-dot"></span>
-        <span class="i18n-count-text"
-          >{{ count }} unsaved change{{ count > 1 ? "s" : "" }}</span
-        >
+      <div class="i18n-save-info">
+        <span class="i18n-badge">{{ count }}</span>
+        <span>unpublished changes</span>
       </div>
-      <button
-        class="i18n-publish-btn"
-        :disabled="loading"
-        @click="$emit('publish')"
-      >
-        {{ loading ? "Saving..." : "Publish to JSON" }}
-      </button>
+
+      <div class="i18n-save-actions">
+        <!-- The new checkbox right next to the publish button -->
+        <label class="i18n-clear-label">
+          <input v-model="clearLocales" type="checkbox" />
+          Clear other locales
+        </label>
+
+        <button
+          class="i18n-publish-btn"
+          :disabled="loading"
+          @click="$emit('publish', clearLocales)"
+        >
+          {{
+            loading
+              ? "Publishing..."
+              : isPublishingToGithub
+                ? "Publish to GitHub"
+                : "Publish"
+          }}
+        </button>
+      </div>
     </div>
-  </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-interface Props {
+const props = defineProps<{
   count: number;
   loading: boolean;
-}
+  initialClearLocales: boolean;
+  isPublishingToGithub: boolean;
+}>();
 
-defineProps<Props>();
-defineEmits<{ (e: "publish"): void }>();
+defineEmits(["publish"]);
+
+const clearLocales = computed(() => props.initialClearLocales);
 </script>
 
 <style scoped>
@@ -94,5 +110,18 @@ defineEmits<{ (e: "publish"): void }>();
 .slide-up-leave-to {
   transform: translateY(100px);
   opacity: 0;
+}
+.i18n-save-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.i18n-clear-label {
+  font-size: 13px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 </style>

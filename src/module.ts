@@ -3,7 +3,6 @@ import {
   addPlugin,
   addServerHandler,
   createResolver,
-  addComponent,
   useLogger,
 } from "@nuxt/kit";
 
@@ -20,6 +19,11 @@ export default defineNuxtModule({
     cleanOnValueChange: true,
     githubRepo: "",
   },
+  moduleDependencies: {
+    "nuxt-auth-utils": {
+      version: "^0.5.29",
+    },
+  },
   setup(options, nuxt) {
     if (process.env.I18N_STUDIO_MODE !== "true") return;
 
@@ -35,32 +39,29 @@ export default defineNuxtModule({
       githubRepo: options.githubRepo,
     };
 
-    if (process.env.DEV === "true" && !options.githubRepo) {
-      logger.warn(
-        "You are running in development mode without a GitHub repo configured. Changes will be written directly to disk. To enable GitHub PR flow, set the 'githubRepo' option to your repository URL.",
-      );
-    }
-
     // ── AST TRANSFORM ───────────────────────────────────────
     nuxt.options.vue = nuxt.options.vue || {};
     nuxt.options.vue.compilerOptions = nuxt.options.vue.compilerOptions || {};
     nuxt.options.vue.compilerOptions.nodeTransforms =
       nuxt.options.vue.compilerOptions.nodeTransforms || [];
 
-    // Use 'unknown' for the incoming node, then safely cast it
     nuxt.options.vue.compilerOptions.nodeTransforms.push((node: unknown) => {
+      // Safely cast to your ASTElement interface
       const el = node as ASTElement;
 
-      if (el.__i18nWrapped) return;
-      if (el.type !== 1 || !el.loc?.source?.includes("$t")) return;
+      // Type 1 = Element
+      if (el.type !== 1 || el.__i18nWrapped) return;
+      if (!el.loc?.source?.includes("$t")) return;
 
       const textKeys: string[] = [];
+      const attrMappings: { attr: string; key: string }[] = [];
 
-      el.children.forEach((child) => {
-        if (child.type === 5) {
-          const interp = child as ASTInterpolation;
+      el.children?.forEach((childNode) => {
+        // Type 5 = Interpolation
+        if (childNode.type === 5) {
+          const child = childNode as ASTInterpolation;
           const expression =
-            interp.content?.content || interp.content?.loc?.source;
+            child.content?.content || child.content?.loc?.source;
 
           if (expression) {
             [...expression.matchAll(i18nRegex)].forEach((match) => {
@@ -70,22 +71,20 @@ export default defineNuxtModule({
         }
       });
 
-      const attrMappings: { attr: string; key: string }[] = [];
+      el.props?.forEach((propNode) => {
+        // Type 7 = Directive
+        if (propNode.type === 7) {
+          const prop = propNode as ASTDirective;
+          if (prop.name === "bind" && prop.exp) {
+            const expStr = prop.exp.loc?.source || prop.exp.content;
+            const attrName = prop.arg?.content;
 
-      el.props?.forEach((prop) => {
-        if (prop.type === 7) {
-          const dir = prop as ASTDirective;
-          if (dir.name === "bind" && dir.exp) {
-            const expStr = dir.exp.loc?.source || dir.exp.content;
-            if (!expStr) return;
-
-            const attrName = dir.arg?.content;
-            if (!attrName) return;
-
-            [...expStr.matchAll(i18nRegex)].forEach((match) => {
-              if (match[1])
-                attrMappings.push({ attr: attrName, key: match[1] });
-            });
+            if (expStr && attrName) {
+              [...expStr.matchAll(i18nRegex)].forEach((match) => {
+                if (match[1])
+                  attrMappings.push({ attr: attrName, key: match[1] });
+              });
+            }
           }
         }
       });
@@ -96,64 +95,84 @@ export default defineNuxtModule({
 
       if (allKeys.length === 0) return;
 
-      const originalNode = { ...el, __i18nWrapped: true };
-      el.tag = "I18nEditable";
-      el.tagType = 1;
+      el.__i18nWrapped = true;
 
-      const newProps: ASTAttribute[] = [
-        {
-          type: 6,
-          name: "translation-key",
-          value: { type: 2, content: allKeys.join(","), loc: el.loc },
-          loc: el.loc,
-        },
-      ];
+      // 1. Inject data-i18n-key (Type 6 = Attribute)
+      el.props.push({
+        type: 6,
+        name: "data-i18n-key",
+        value: { type: 2, content: allKeys.join(","), loc: el.loc },
+        loc: el.loc,
+      } as ASTAttribute);
 
+      // 2. Inject data-i18n-attrs
       if (attrMappings.length > 0) {
-        newProps.push({
+        el.props.push({
           type: 6,
-          name: "translatable-attrs",
+          name: "data-i18n-attrs",
           value: {
             type: 2,
             content: JSON.stringify(attrMappings),
             loc: el.loc,
           },
           loc: el.loc,
-        });
+        } as ASTAttribute);
       }
 
-      el.props = newProps;
-      el.children = [originalNode];
+      // 3. Inject our Custom Directive (v-i18n-studio) (Type 7 = Directive)
+      el.props.push({
+        type: 7,
+        name: "i18n-studio",
+        loc: el.loc,
+      } as ASTDirective);
     });
 
     // ── REGISTRATIONS ───────────────────────────────────────
-    addComponent({
-      name: "I18nEditable",
-      filePath: resolver.resolve("./runtime/components/I18nEditable.vue"),
-      global: true,
+    nuxt.options.css.push(resolver.resolve("./runtime/assets/style.css"));
+
+    addPlugin({
+      src: resolver.resolve("./runtime/plugins/directive"),
+      order: 1,
     });
+
     addPlugin({
       src: resolver.resolve("./runtime/plugins/client"),
       mode: "client",
-      order: 1,
+      order: 2,
     });
+
     addPlugin({
       src: resolver.resolve("./runtime/plugins/freeze-timer"),
       mode: "client",
       order: 0,
     });
+
+    addPlugin({
+      src: resolver.resolve("./runtime/plugins/page-tracker-i18n"),
+      mode: "client",
+      order: 3,
+    });
+
     addServerHandler({
       route: "/api/__i18n_studio/update",
       handler: resolver.resolve("./runtime/server/api/__i18n_studio/update"),
     });
     addServerHandler({
-      route: "/api/__i18n_studio/auth",
-      handler: resolver.resolve("./runtime/server/api/__i18n_studio/auth"),
+      route: "/api/__i18n_studio/auth/add_token",
+      handler: resolver.resolve(
+        "./runtime/server/api/__i18n_studio/auth/add_token",
+      ),
     });
     addServerHandler({
-      route: "/api/__i18n_studio/verify_token",
+      route: "/api/__i18n_studio/auth/verify_token",
       handler: resolver.resolve(
-        "./runtime/server/api/__i18n_studio/verify_token",
+        "./runtime/server/api/__i18n_studio/auth/verify_token",
+      ),
+    });
+    addServerHandler({
+      route: "/api/__i18n_studio/auth/clear_token",
+      handler: resolver.resolve(
+        "./runtime/server/api/__i18n_studio/auth/clear_token",
       ),
     });
   },

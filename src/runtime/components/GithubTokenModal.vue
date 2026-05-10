@@ -52,8 +52,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
-
 // Define props using TypeScript interface
 const props = defineProps<{
   isOpen: boolean;

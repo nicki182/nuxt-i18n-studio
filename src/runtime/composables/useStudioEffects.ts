@@ -1,3 +1,5 @@
+import { onMounted, onUnmounted, watch } from "vue";
+
 import { useStudioState } from "./useStudioState";
 
 let isHmrAttached = false;

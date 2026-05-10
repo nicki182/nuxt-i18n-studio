@@ -1,7 +1,6 @@
 <template>
   <Teleport to="body">
     <div v-if="isOpen" class="i18n-modal-overlay" @click.self="$emit('close')">
-      <!-- Changed from div to form to enable native HTML validation -->
       <form class="i18n-modal-card" @submit.prevent="handleSave">
         <h3 class="i18n-modal-header">Edit Translations</h3>
 
@@ -12,7 +11,6 @@
               {{ t.usages.map((u) => u.replace("attr:", "")).join(", ") }}
             </span>
           </label>
-          <!-- Added 'required' attribute here -->
           <textarea
             v-model="localValues[t.key]"
             class="i18n-input"
@@ -22,16 +20,7 @@
           ></textarea>
         </div>
 
-        <div class="i18n-options-group">
-          <label class="i18n-checkbox-label">
-            <!-- Added 'required' attribute here -->
-            <input v-model="clearOtherLocales" type="checkbox" required />
-            Clear other locales
-          </label>
-        </div>
-
         <div class="i18n-modal-footer">
-          <!-- Type set to button so it doesn't trigger form submission -->
           <button
             type="button"
             class="i18n-btn-secondary"
@@ -39,8 +28,6 @@
           >
             Cancel
           </button>
-
-          <!-- Type set to submit to trigger the form validation -->
           <button type="submit" class="i18n-btn-primary">Apply Preview</button>
         </div>
       </form>
@@ -53,34 +40,16 @@ interface Props {
   isOpen: boolean;
   translations?: { key: string; usages: string[] }[];
   initialValues: Record<string, string>;
-  clearLocalesDefault?: boolean;
 }
 const props = withDefaults(defineProps<Props>(), {
   translations: () => [],
-  clearLocalesDefault: false,
 });
 
 const emit = defineEmits(["close", "save"]);
-
-const localValues = ref<Record<string, string>>({});
-const clearOtherLocales = ref(props.clearLocalesDefault);
-
-watch(
-  () => props.isOpen,
-  (newVal) => {
-    if (newVal) {
-      // Look how clean this is with a ref!
-      localValues.value = { ...props.initialValues };
-      clearOtherLocales.value = props.clearLocalesDefault;
-    }
-  },
-);
+const localValues = computed(() => ({ ...props.initialValues }));
 
 const handleSave = () => {
-  emit("save", {
-    values: { ...localValues.value }, // Just remember to use .value here
-    clearOtherLocales: clearOtherLocales.value,
-  });
+  emit("save", { ...localValues.value }); // Only emit the values!
 };
 </script>
 

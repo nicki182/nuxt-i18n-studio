@@ -1,5 +1,3 @@
-import type { I18nInstance } from "../types/i18n";
-
 import { useStudioState } from "../composables/useStudioState";
 
 export default defineNuxtPlugin((nuxtApp) => {
@@ -7,26 +5,31 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   const { addKey, clearKeys } = useStudioState();
 
+  // We use `app:created` to ensure the Vue app exists, but we intercept `globalProperties.$t`
   nuxtApp.hook("app:created", () => {
-    // 2. Safely cast the Nuxt app to include our expected $i18n type
-    const app = nuxtApp as unknown as { $i18n?: I18nInstance };
+    const globalProps = nuxtApp.vueApp.config.globalProperties;
 
-    if (!app.$i18n || typeof app.$i18n.t !== "function") return;
+    // Check if $t exists on the global properties (injected by @nuxtjs/i18n)
+    if (typeof globalProps.$t !== "function") {
+      console.warn("[i18n Studio] Could not find global $t function to track.");
+      return;
+    }
 
-    const originalT = app.$i18n.t;
+    const originalT = globalProps.$t;
 
-    // 3. Use standard function notation so `this` is correctly inferred for `apply`
-    app.$i18n.t = function (this: I18nInstance, ...args: unknown[]) {
+    // Override the global $t function used in templates
+    globalProps.$t = function (this: unknown, ...args: unknown[]) {
       const key = args[0];
       if (typeof key === "string") {
         addKey(key);
       }
 
-      // 4. Safely apply without using `any`
+      // Safely call the original $t function
       return originalT.apply(this, args);
     };
   });
 
+  // Clear keys when navigating to a new page
   nuxtApp.hook("page:finish", () => {
     clearKeys();
   });
