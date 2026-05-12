@@ -72,6 +72,9 @@
   },
   "dependencies": {
     "@nuxt/kit": "^4.4.2",
+    "@vue/compiler-sfc": "^3.5.34",
+    "acorn": "^8.16.0",
+    "acorn-walk": "^8.3.5",
     "nuxt-auth-utils": "^0.5.29",
     "octokit": "^5.0.5",
     "zod": "^4.3.6"

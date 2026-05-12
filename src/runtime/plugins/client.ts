@@ -9,6 +9,7 @@ import StudioModal from "../components/StudioModal.vue";
 import StudioSaveBar from "../components/StudioSaveBar.vue";
 import { useStudioEffects } from "../composables/useStudioEffects";
 import { useStudioToken } from "../composables/useStudioToken";
+import { updateJSON } from "../utils/updateJSON";
 
 export default defineNuxtPlugin((nuxtApp) => {
   if (import.meta.server) return;
@@ -32,7 +33,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     (translations: { key: string; usages: string[] }[], el?: HTMLElement) => {
       modalState.translations = translations;
       modalState.targetElement = el;
-
+      console.log("Provided translations for modal:", translations, "Target element:", el);
       const i18n = (nuxtApp as unknown as { $i18n?: I18nInstance }).$i18n;
       const currentLocale = i18n?.locale?.value || "en";
       const messages = i18n?.getLocaleMessage?.(currentLocale) || {};
@@ -44,6 +45,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
         // 1. Get the raw value from the i18n instance safely
         const resolved = t.key.split(".").reduce((o: unknown, k: string) => {
+          console.log(`Resolving key part "${k}" in`, o, messages);
           // Safely traverse the object tree
           if (o && typeof o === "object" && o !== null && k in o) {
             return (o as Record<string, unknown>)[k];
@@ -81,7 +83,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
         // 3. Assign the initial value (make sure to use .translations here since we restructured it!)
         initials[t.key] =
-          pendingChanges.value.translations[t.key] ||
+          pendingChanges.value[t.key] || // <--- Removed .translations
           rawJsonVal ||
           fallbackDomVal;
       });
@@ -112,23 +114,34 @@ export default defineNuxtPlugin((nuxtApp) => {
         if (!import.meta.dev) checkAuth();
       });
 
-      const handleSave = (vals: Record<string, string>) => {
-        Object.assign(pendingChanges.value, { ...vals });
-        const el = modalState.targetElement;
+      const handleSave = (newTranslations: Record<string, string>) => {
+        Object.assign(pendingChanges.value, newTranslations);
 
-        modalState.translations.forEach((t) => {
-          const newVal = vals[t.key] ?? "";
-          if (el) {
-            t.usages.forEach((u) => {
-              if (u === "text") {
-                el.textContent = newVal;
-              } else if (u.startsWith("attr:")) {
-                const attrName = u.slice(5);
-                el.setAttribute(attrName, String(newVal));
-              }
-            });
-          }
-        });
+        const i18n = (nuxtApp as unknown as { $i18n?: any }).$i18n;
+        const currentLocale = i18n?.locale?.value || "en";
+
+        if (i18n) {
+          // 1. Get the current messages from vue-i18n
+          let updatedMessages = { ...i18n.getLocaleMessage(currentLocale) };
+
+          // 2. Loop through the changes and apply them using your smart helper
+          Object.entries(newTranslations).forEach(([key, val]) => {
+            const result = updateJSON(
+              updatedMessages,
+              key,
+              val,
+              config.isFlatJson,
+            );
+
+            // If the helper successfully updated the object, keep the result
+            if (result) {
+              updatedMessages = result;
+            }
+          });
+
+          // 3. Merge the fully updated object back into vue-i18n
+          i18n.mergeLocaleMessage(currentLocale, updatedMessages);
+        }
         modalState.open = false;
       };
 

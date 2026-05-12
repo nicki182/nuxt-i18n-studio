@@ -1,12 +1,13 @@
-import {
-  defineNuxtModule,
+
+
+import {  defineNuxtModule,
   addPlugin,
   addServerHandler,
   createResolver,
   useLogger,
 } from "@nuxt/kit";
 
-const i18nRegex = /\$t\(\s*['"`]([^'"`]+)['"`]/g;
+import { extractI18nArguments } from "./runtime/utils/extractI18nArguments";
 
 export default defineNuxtModule({
   meta: {
@@ -39,92 +40,75 @@ export default defineNuxtModule({
       githubRepo: options.githubRepo,
     };
 
-    // ── AST TRANSFORM ───────────────────────────────────────
-    nuxt.options.vue = nuxt.options.vue || {};
-    nuxt.options.vue.compilerOptions = nuxt.options.vue.compilerOptions || {};
+    // ── VUE AST TRANSFORM (Hybrid Architecture) ───────────────
     nuxt.options.vue.compilerOptions.nodeTransforms =
       nuxt.options.vue.compilerOptions.nodeTransforms || [];
-
     nuxt.options.vue.compilerOptions.nodeTransforms.push((node: unknown) => {
-      // Safely cast to your ASTElement interface
       const el = node as ASTElement;
 
-      // Type 1 = Element
-      if (el.type !== 1 || el.__i18nWrapped) return;
-      if (!el.loc?.source?.includes("$t")) return;
+      if (el.type !== 1 || (el as any).__i18nWrapped) return;
+      if (el.tagType === 2 || el.tagType === 3) return;
+      if (!el.loc?.source?.includes("$t") && !el.loc?.source?.includes(" t("))
+        return;
 
-      const textKeys: string[] = [];
-      const attrMappings: { attr: string; key: string }[] = [];
+      if (!el.props || !Array.isArray(el.props)) el.props = [];
 
+      const dynamicExpressions: { key: string; type: string }[] = [];
+
+      // 1. Check inner text interpolations (e.g. {{ $t('key') }})
       el.children?.forEach((childNode) => {
-        // Type 5 = Interpolation
         if (childNode.type === 5) {
           const child = childNode as ASTInterpolation;
-          const expression =
-            child.content?.content || child.content?.loc?.source;
-
+          const expression = child.content?.content;
           if (expression) {
-            [...expression.matchAll(i18nRegex)].forEach((match) => {
-              if (match[1]) textKeys.push(match[1]);
+            extractI18nArguments(expression).forEach((key) => {
+              dynamicExpressions.push({ key, type: "text:dynamic" });
             });
           }
         }
       });
 
+      // 2. Check Vue attribute bindings (e.g. :placeholder="$t('key')")
       el.props?.forEach((propNode) => {
-        // Type 7 = Directive
         if (propNode.type === 7) {
           const prop = propNode as ASTDirective;
-          if (prop.name === "bind" && prop.exp) {
-            const expStr = prop.exp.loc?.source || prop.exp.content;
+          if (prop.name === "bind" && prop.exp?.content) {
             const attrName = prop.arg?.content;
-
-            if (expStr && attrName) {
-              [...expStr.matchAll(i18nRegex)].forEach((match) => {
-                if (match[1])
-                  attrMappings.push({ attr: attrName, key: match[1] });
+            if (attrName) {
+              extractI18nArguments(prop.exp.content).forEach((key) => {
+                dynamicExpressions.push({ key, type: `attr:${attrName}` });
               });
             }
           }
         }
       });
+      if (dynamicExpressions.length === 0) return;
+      (el as any).__i18nWrapped = true;
 
-      const allKeys = [
-        ...new Set([...textKeys, ...attrMappings.map((m) => m.key)]),
-      ];
+      // Encode payload to Base64 to guarantee Vue compilation safety
+      const payload = JSON.stringify(dynamicExpressions);
+      const base64Payload = btoa(payload);
+      const finalExpression = base64Payload;
+      console.log("Attaching i18n usages to element:", dynamicExpressions);
+      const locStub = {
+        source: finalExpression,
+        start: { offset: 0, line: 1, column: 1 },
+        end: { offset: 0, line: 1, column: 1 },
+      };
 
-      if (allKeys.length === 0) return;
-
-      el.__i18nWrapped = true;
-
-      // 1. Inject data-i18n-key (Type 6 = Attribute)
-      el.props.push({
-        type: 6,
-        name: "data-i18n-key",
-        value: { type: 2, content: allKeys.join(","), loc: el.loc },
-        loc: el.loc,
-      } as ASTAttribute);
-
-      // 2. Inject data-i18n-attrs
-      if (attrMappings.length > 0) {
-        el.props.push({
-          type: 6,
-          name: "data-i18n-attrs",
-          value: {
-            type: 2,
-            content: JSON.stringify(attrMappings),
-            loc: el.loc,
-          },
-          loc: el.loc,
-        } as ASTAttribute);
-      }
-
-      // 3. Inject our Custom Directive (v-i18n-studio) (Type 7 = Directive)
       el.props.push({
         type: 7,
         name: "i18n-studio",
-        loc: el.loc,
-      } as ASTDirective);
+        modifiers: [],
+        exp: {
+          type: 4,
+          content: finalExpression,
+          isStatic: true,
+          isConstant: true,
+          loc: locStub,
+        },
+        loc: locStub,
+      } as any);
     });
 
     // ── REGISTRATIONS ───────────────────────────────────────
