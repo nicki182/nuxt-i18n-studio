@@ -1,17 +1,23 @@
-import type { ExtractedKey, ValueMap } from "../../types";
+import type { ConditionalExpression } from "estree";
 
+import type { ExtractedKey, ScriptVariableMap } from "../../types";
+
+import { nodeResolver } from "./nodeResolver";
+
+/**
+ *
+ * @param args
+ * @param args.node
+ * @param args.rawSource
+ * @param args.valueMap
+ */
 export function resolveConditionalExpression(args: {
-  node: any;
+  node: ConditionalExpression;
   rawSource: string;
-  valueMap: ValueMap;
-  resolver: (args: {
-    node: any;
-    rawSource: string;
-    valueMap: ValueMap;
-  }) => ExtractedKey[];
+  valueMap: ScriptVariableMap;
 }): ExtractedKey[] {
-  const { node, rawSource, valueMap, resolver } = args;
-  const valuesC = resolver({ node: node.consequent, rawSource, valueMap });
-  const valuesA = resolver({ node: node.alternate, rawSource, valueMap });
+  const { node, rawSource, valueMap } = args;
+  const valuesC = nodeResolver({ node: node.consequent, rawSource, valueMap });
+  const valuesA = nodeResolver({ node: node.alternate, rawSource, valueMap });
   return [...valuesC, ...valuesA];
 }

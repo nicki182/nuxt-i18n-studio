@@ -1,27 +1,64 @@
-// harvestFromCallExpression.ts
+import type {
+  CallExpression,
+  Expression,
+  Identifier,
+  Literal,
+  ObjectExpression,
+  ArrayExpression,
+  Property,
+  SpreadElement,
+} from "estree";
+
 import type { ReturnHarvestedValue } from "../../types";
 
-// harvestFromCallExpression.ts
+/**
+ *
+ * @param node
+ */
 export function harvestFromCallExpression(
-  node: any,
+  node: CallExpression,
 ): ReturnHarvestedValue | undefined {
-  if (node.callee?.name !== "defineProps") return;
+  // callee is Expression | Super — narrow to Identifier for name check
+  if (
+    node.callee.type !== "Identifier" ||
+    (node.callee as Identifier).name !== "defineProps"
+  )
+    return;
 
   const results: ReturnHarvestedValue = [];
-  const arg = node.arguments[0];
+  const arg = node.arguments[0] as Expression | undefined;
+  if (!arg) return results;
 
-  if (arg?.type === "ObjectExpression") {
-    arg.properties.forEach((prop: any) => {
-      const propName = prop.key?.name || prop.key?.value;
-      if (propName)
-        results.push({ name: propName, value: "__PROP__", isProp: true });
-    });
+  // defineProps({ titleKey: String, ... })
+  if (arg.type === "ObjectExpression") {
+    (arg as ObjectExpression).properties.forEach(
+      (prop: Property | SpreadElement) => {
+        // Skip spread elements — ...rest has no static key
+        if (prop.type === "SpreadElement") return;
+
+        const key = (prop as Property).key;
+        const propName =
+          key.type === "Identifier"
+            ? (key as Identifier).name
+            : key.type === "Literal"
+              ? String((key as Literal).value)
+              : null;
+
+        if (propName) {
+          results.push({ name: propName, value: "__PROP__", isProp: true });
+        }
+      },
+    );
   }
 
-  if (arg?.type === "ArrayExpression") {
-    arg.elements.forEach((el: any) => {
-      if (el?.type === "Literal" && typeof el.value === "string") {
-        results.push({ name: el.value, value: "__PROP__", isProp: true });
+  // defineProps(['titleKey', 'otherKey'])
+  if (arg.type === "ArrayExpression") {
+    (arg as ArrayExpression).elements.forEach((el) => {
+      // elements can be Expression | SpreadElement | null (sparse arrays)
+      if (!el || el.type !== "Literal") return;
+      const literal = el as Literal;
+      if (typeof literal.value === "string") {
+        results.push({ name: literal.value, value: "__PROP__", isProp: true });
       }
     });
   }

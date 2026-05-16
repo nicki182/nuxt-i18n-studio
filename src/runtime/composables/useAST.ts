@@ -1,8 +1,20 @@
+import type { ComponentPublicInstance } from "vue";
+
 import type { ExtractedKey, ResolvedEntry, EntryResolver } from "../types/ast";
 import type { ResolvedUsage } from "../types/i18nHTMLElement";
 
+// Payload injected by the compiler includes the usageType
+type PayloadEntry = ExtractedKey & { usageType?: string };
+
+/**
+ *
+ */
 export function useAST() {
-  const evaluateExpr = (expr: string, ctx: any): string | undefined => {
+  const evaluateExpr = (
+    expr: string,
+    ctx: ComponentPublicInstance | null,
+  ): string | undefined => {
+    if (!ctx) return undefined;
     try {
       return new Function("ctx", `with(ctx) { return ${expr}; }`)(ctx);
     } catch {
@@ -10,11 +22,11 @@ export function useAST() {
     }
   };
 
-  const decodePayload = (raw: string): ExtractedKey[] => {
+  const decodePayload = (raw: string): PayloadEntry[] => {
     try {
       const clean = raw.trim().replace(/^['"]|['"]$/g, "");
       const decoded = atob(clean);
-      return JSON.parse(decoded) as ExtractedKey[];
+      return JSON.parse(decoded) as PayloadEntry[];
     } catch {
       return [];
     }
@@ -51,7 +63,6 @@ export function useAST() {
         source: "runtime" as const,
       }));
     }
-    // Fallback: show the prefix itself so editor knows something is there
     return [{ key: `${entry.prefix}*`, usageType, source: "runtime" as const }];
   };
 
@@ -70,53 +81,61 @@ export function useAST() {
     return results;
   };
 
-const resolveDynamic: EntryResolver<
-  Extract<ExtractedKey, { type: "dynamic" }>
-> = ({ entry, usageType, getPageKeys, bindingInstance }) => {
-  const results: ResolvedEntry[] = [];
-  const evaled = evaluateExpr(entry.expr, bindingInstance);
+  const resolveDynamic: EntryResolver<
+    Extract<ExtractedKey, { type: "dynamic" }>
+  > = ({ entry, usageType, getPageKeys, bindingInstance }) => {
+    const results: ResolvedEntry[] = [];
+    const evaled = evaluateExpr(entry.expr, bindingInstance);
 
-  if (evaled) {
-    // We know the current value — only surface related keys
-    results.push({ key: evaled, usageType, source: "runtime" });
-    getPageKeys()
-      .filter((k) => k === evaled || k.startsWith(evaled.split(".")[0]))
-      .forEach((k) => results.push({ key: k, usageType, source: "runtime" }));
-  }
-  // Only fall back to ALL page keys if eval completely failed
-  // and there are no candidates at all — avoids flooding the modal
-  else if (entry.candidates?.length) {
-    entry.candidates.forEach((k) =>
-      results.push({ key: k, usageType, source: "traced" })
-    );
-  } else {
-    // Truly unknown — nothing to narrow by, surface all as last resort
-    getPageKeys().forEach((k) =>
-      results.push({ key: k, usageType, source: "runtime" })
-    );
-  }
+    if (evaled) {
+      results.push({ key: evaled, usageType, source: "runtime" });
+      getPageKeys()
+        .filter((k) => k === evaled || k.startsWith(evaled.split(".")[0] ?? ""))
+        .forEach((k) => results.push({ key: k, usageType, source: "runtime" }));
+    } else if (entry.candidates?.length) {
+      entry.candidates.forEach((k) =>
+        results.push({ key: k, usageType, source: "traced" }),
+      );
+    } else {
+      getPageKeys().forEach((k) =>
+        results.push({ key: k, usageType, source: "runtime" }),
+      );
+    }
 
-  return results;
-};
-  const entryTypeResolver: Record<string, EntryResolver<any>> = {
-    static: resolveStatic,
-    traced: resolveTraced,
-    prefix: resolvePrefix,
-    prop: resolveProp,
-    dynamic: resolveDynamic,
+    return results;
+  };
+
+  // We use `unknown` here because the types of `entry` branch based on `entry.type` inside the specific resolver
+  const entryTypeResolver: Record<
+    string,
+    EntryResolver<Extract<ExtractedKey, { type: ExtractedKey }>>
+  > = {
+    static: resolveStatic as EntryResolver<
+      Extract<ExtractedKey, { type: "static" }>
+    >,
+    traced: resolveTraced as EntryResolver<
+      Extract<ExtractedKey, { type: "traced" }>
+    >,
+    prefix: resolvePrefix as EntryResolver<
+      Extract<ExtractedKey, { type: "prefix" }>
+    >,
+    prop: resolveProp as EntryResolver<Extract<ExtractedKey, { type: "prop" }>>,
+    dynamic: resolveDynamic as EntryResolver<
+      Extract<ExtractedKey, { type: "dynamic" }>
+    >,
   };
 
   // ── resolveUsages ─────────────────────────────────────────────────────────
 
   const resolveUsages = (
-    payload: ExtractedKey[],
-    bindingInstance: any,
+    payload: PayloadEntry[],
+    bindingInstance: ComponentPublicInstance | null,
     getPageKeys: () => string[],
   ): ResolvedUsage[] => {
     const seen = new Set<string>();
     return payload
       .flatMap((entry) => {
-        const usageType = (entry as any).usageType ?? "text:dynamic";
+        const usageType = entry.usageType ?? "text:dynamic";
         const resolver = entryTypeResolver[entry.type];
         return (
           resolver?.({ entry, usageType, getPageKeys, bindingInstance }) ?? []
@@ -134,4 +153,4 @@ const resolveDynamic: EntryResolver<
   };
 
   return { evaluateExpr, decodePayload, resolveUsages };
-};
+}

@@ -1,8 +1,22 @@
-import type { ExtractedKey, ValueMap } from "../../types";
+// resolveIdentifier.ts
+import type { Identifier } from "estree";
 
+import {
+  KeyExtractionType,
+  type ExtractedKey,
+  type ScriptVariableMap,
+} from "../../types";
+
+/**
+ *
+ * @param args
+ * @param args.node
+ * @param args.valueMap
+ * @param args.rawSource
+ */
 export function resolveIdentifier(args: {
-  node: any;
-  valueMap: ValueMap;
+  node: Identifier;
+  valueMap: ScriptVariableMap;
   rawSource: string;
 }): ExtractedKey[] {
   const { node, valueMap, rawSource } = args;
@@ -12,7 +26,7 @@ export function resolveIdentifier(args: {
   if (!candidates) {
     return [
       {
-        type: "dynamic",
+        type: KeyExtractionType.Dynamic,
         expr: rawSource,
         candidates: [],
         id: `__EXPR__${rawSource}`,
@@ -21,17 +35,27 @@ export function resolveIdentifier(args: {
   }
 
   if (candidates[0] === "__PROP__") {
-    return [{ type: "prop", propName: name, id: `__PROP__${name}` }];
+    return [
+      { type: KeyExtractionType.Prop, propName: name, id: `__PROP__${name}` },
+    ];
   }
-  const results = [];
+
+  const results: ExtractedKey[] = [];
+
   results.push({
-    type: "traced",
-    key: candidates[0],
+    type: KeyExtractionType.Traced,
+    key: candidates[0] ?? "",
     allCandidates: [...candidates],
-    id: `__TRACED__${candidates[0]}`,
+    id: `__TRACED__${candidates[0] ?? ""}` as `__TRACED__${string}`,
   });
+
   candidates.forEach((c) => {
-    results.push({ type: "static", key: c, id: `__STATIC__${c}` });
+    results.push({
+      type: KeyExtractionType.Static,
+      key: c,
+      id: `__STATIC__${c}` as `__STATIC__${string}`,
+    });
   });
+
   return results;
 }

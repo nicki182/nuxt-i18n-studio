@@ -1,6 +1,31 @@
+import type {
+  BlockStatement,
+  ConditionalExpression,
+  Expression,
+  Literal,
+  LogicalExpression,
+  ReturnStatement,
+  TemplateLiteral,
+} from "estree";
+
 import type { ReturnHarvestedValue } from "../../types";
 
-export function harvestLiterals(node: any, name: string): ReturnHarvestedValue {
+/**
+ *
+ * @param node
+ * @param name
+ */
+export function harvestLiterals(
+  node:
+    | Literal
+    | ConditionalExpression
+    | LogicalExpression
+    | TemplateLiteral
+    | ReturnStatement
+    | BlockStatement
+    | Expression,
+  name: string,
+): ReturnHarvestedValue {
   if (!node) return [] as ReturnHarvestedValue;
 
   if (node.type === "Literal" && typeof node.value === "string") {
@@ -9,20 +34,20 @@ export function harvestLiterals(node: any, name: string): ReturnHarvestedValue {
 
   if (node.type === "ConditionalExpression") {
     return [
-      ...harvestLiterals(node.consequent, name),
-      ...harvestLiterals(node.alternate, name),
+      ...harvestLiterals(node.consequent as ConditionalExpression, name),
+      ...harvestLiterals(node.alternate as ConditionalExpression, name),
     ] as ReturnHarvestedValue;
   }
 
   if (node.type === "LogicalExpression") {
     return [
-      ...harvestLiterals(node.left, name),
-      ...harvestLiterals(node.right, name),
+      ...harvestLiterals(node.left as LogicalExpression, name),
+      ...harvestLiterals(node.right as LogicalExpression, name),
     ] as ReturnHarvestedValue;
   }
 
   if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
-    const full = node.quasis.map((q: any) => q.value.cooked).join("");
+    const full = node.quasis.map((q) => q.value.cooked).join("");
     return full ? [{ value: full, name }] : ([] as ReturnHarvestedValue);
   }
 

@@ -8,6 +8,9 @@ import { mapScriptState } from "./script/mapScriptState";
 // compilation — so we can parse the script block, build the valueMap, and
 // cache it keyed by file ID for the nodeTransform to read.
 
+/**
+ *
+ */
 export function ASTPlugin(): ASTPlugin {
   // Per-file cache: absolute path → valueMap
   // Invalidated on HMR so edits to script variables are picked up immediately

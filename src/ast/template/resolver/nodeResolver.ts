@@ -1,4 +1,15 @@
-import type { ValueMap, ExtractedKey } from "../../types";
+import type {
+  CallExpression,
+  ConditionalExpression,
+  Identifier,
+  Literal,
+  LogicalExpression,
+  TemplateLiteral,
+  Expression,
+  SpreadElement,
+} from "estree";
+
+import type { ResolverMap, ScriptVariableMap, ExtractedKey } from "../../types";
 
 import { resolveCallExpression } from "./resolveCallExpression";
 import { resolveConditionalExpression } from "./resolveConditionalExpression";
@@ -7,7 +18,7 @@ import { resolveLiteral } from "./resolveLiteral";
 import { resolveLogicalExpression } from "./resolveLogicalExpression";
 import { resolveTemplateLiteral } from "./resolveTemplateLiteral";
 
-const getNodeTypeResolver = {
+const getNodeTypeResolver: ResolverMap = {
   Literal: resolveLiteral,
   Identifier: resolveIdentifier,
   ConditionalExpression: resolveConditionalExpression,
@@ -16,20 +27,33 @@ const getNodeTypeResolver = {
   TemplateLiteral: resolveTemplateLiteral,
 };
 
+/**
+ *
+ * @param args
+ * @param args.node
+ * @param args.rawSource
+ * @param args.valueMap
+ */
 export function nodeResolver(args: {
-  node: any;
+  node:
+    | Literal
+    | Identifier
+    | ConditionalExpression
+    | LogicalExpression
+    | CallExpression
+    | TemplateLiteral
+    | Expression
+    | SpreadElement
+    | undefined
+    | null;
   rawSource: string;
-  valueMap: ValueMap;
+  valueMap: ScriptVariableMap;
 }): ExtractedKey[] {
   const { node } = args;
   if (!node) return [];
 
   const resolver = getNodeTypeResolver[node.type];
-  if (resolver) {
-    return resolver({
-      ...args,
-      resolver: nodeResolver,
-    });
-  }
-  return [];
+  if (!resolver) return [];
+
+  return resolver(args);
 }

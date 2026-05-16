@@ -1,3 +1,5 @@
+import type { ComponentPublicInstance } from "vue";
+
 interface ASTElement {
   type: number;
   tagType?: number;
@@ -20,18 +22,35 @@ interface ASTDirective {
   loc: unknown;
 }
 
-export type ExtractedKey =
-  | { type: "static"; key: string }
-  | { type: "traced"; key: string; allCandidates: string[] }
-  | { type: "prop"; propName: string }
-  | { type: "dynamic"; expr: string; candidates: string[] }
-  | { type: "prefix"; prefix: string };
+export enum KeyExtractionType {
+  Static = "static",
+  Traced = "traced",
+  Prop = "prop",
+  Dynamic = "dynamic",
+  Prefix = "prefix",
+}
 
-  type ResolvedEntry = Omit<ResolvedUsage, "type"> & { usageType: string };
+export type ExtractedKey =
+  | { type: KeyExtractionType.Static; key: string }
+  | { type: KeyExtractionType.Traced; key: string; allCandidates: string[] }
+  | { type: KeyExtractionType.Prop; propName: string }
+  | { type: KeyExtractionType.Dynamic; expr: string; candidates: string[] }
+  | { type: KeyExtractionType.Prefix; prefix: string };
+
+type ResolvedEntry = Omit<ResolvedUsage, "type"> & { usageType: string };
 
 type EntryResolver<T extends ExtractedKey> = (args: {
   entry: T;
   usageType: string;
   getPageKeys: () => string[];
-  bindingInstance: any;
+  bindingInstance: ComponentPublicInstance | null;
 }) => ResolvedEntry[];
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+// What the directive passes to openModal — one entry per unique key
+export interface TranslationEntry {
+  key: string;
+  usages: string[]; // ["text:dynamic", "attr:placeholder"]
+  source: KeyExtractionType;
+}

@@ -3,22 +3,34 @@ import type { Plugin } from "vite";
 // "__PROP__" sentinel means: value comes from a parent prop
 export type ScriptVariableMap = Map<string, string[]>;
 
+export enum KeyExtractionType {
+  Static = "static",
+  Traced = "traced",
+  Prop = "prop",
+  Dynamic = "dynamic",
+  Prefix = "prefix",
+}
+
 export type ExtractedKey =
-  | { type: "static"; key: string; id: `__STATIC__${string}` }
+  | { type: KeyExtractionType.Static; key: string; id: `__STATIC__${string}` }
   | {
-      type: "traced";
+      type: KeyExtractionType.Traced;
       key: string;
       allCandidates: string[];
       id: `__TRACED__${string}`;
     }
-  | { type: "prop"; propName: string; id: `__PROP__${string}` }
+  | { type: KeyExtractionType.Prop; propName: string; id: `__PROP__${string}` }
   | {
-      type: "dynamic";
+      type: KeyExtractionType.Dynamic;
       expr: string;
       candidates: string[];
       id: `__EXPR__${string}`;
     }
-  | { type: "prefix"; prefix: string; id: `__PREFIX__${string}` };
+  | {
+      type: KeyExtractionType.Prefix;
+      prefix: string;
+      id: `__PREFIX__${string}`;
+    };
 
 export interface HarvestedValue {
   value: string;
@@ -33,3 +45,15 @@ export interface ASTPlugin extends Plugin {
 }
 
 export type PayloadEntry = ExtractedKey & { usageType: string };
+
+export type HarvesterMap = {
+  [K in Node["type"]]?: (
+    node: Extract<Node, { type: K }>,
+  ) => ReturnHarvestedValue | undefined;
+};
+
+export type ResolverMap = {
+  [K in ResolvableNode["type"]]?: (
+    args: ResolverArgs<Extract<ResolvableNode, { type: K }>>,
+  ) => ExtractedKey[];
+};

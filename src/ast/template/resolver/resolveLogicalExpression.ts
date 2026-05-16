@@ -1,17 +1,22 @@
-import type { ExtractedKey, ValueMap } from "../../types";
+import type { LogicalExpression } from "estree";
 
+import type { ExtractedKey, ScriptVariableMap } from "../../types";
+
+import { nodeResolver } from "./nodeResolver";
+/**
+ *
+ * @param args
+ * @param args.node
+ * @param args.rawSource
+ * @param args.valueMap
+ */
 export function resolveLogicalExpression(args: {
-  node: any;
+  node: LogicalExpression;
   rawSource: string;
-  valueMap: ValueMap;
-  resolver: (args: {
-    node: any;
-    rawSource: string;
-    valueMap: ValueMap;
-  }) => ExtractedKey[];
+  valueMap: ScriptVariableMap;
 }): ExtractedKey[] {
-  const { node, rawSource, valueMap, resolver } = args;
-  const valuesL = resolver({ node: node.left, rawSource, valueMap });
-  const valuesR = resolver({ node: node.right, rawSource, valueMap });
+  const { node, rawSource, valueMap } = args;
+  const valuesL = nodeResolver({ node: node.left, rawSource, valueMap });
+  const valuesR = nodeResolver({ node: node.right, rawSource, valueMap });
   return [...valuesL, ...valuesR];
 }

@@ -1,8 +1,17 @@
 // ── client plugin ─────────────────────────────────────────────────────────────
 // Mounts the Studio UI, provides the open-modal function, handles save/publish.
 
-import { render, defineComponent, ref, reactive, h, nextTick, onMounted } from "vue";
+import {
+  render,
+  defineComponent,
+  ref,
+  reactive,
+  h,
+  nextTick,
+  onMounted,
+} from "vue";
 
+import type { TranslationEntry } from "../types/ast";
 import type { FetchError } from "../types/error";
 import type { I18nInstance } from "../types/i18n";
 
@@ -13,20 +22,6 @@ import StudioSaveBar from "../components/StudioSaveBar.vue";
 import { useStudioEffects } from "../composables/useStudioEffects";
 import { useStudioToken } from "../composables/useStudioToken";
 import { updateJSON } from "../utils/updateJSON";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-// What the directive passes to openModal — one entry per unique key
-export interface TranslationEntry {
-  key: string;
-  usages: string[];    // ["text:dynamic", "attr:placeholder"]
-  source: "static" | "traced" | "runtime" | "prop";
-}
-
-type OpenModalFn = (
-  translations: TranslationEntry[],
-  el: HTMLElement
-) => void;
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
@@ -101,14 +96,12 @@ export default defineNuxtPlugin((nuxtApp) => {
         });
 
         initials[t.key] =
-          pendingChanges.value[t.key] ||
-          rawJsonVal ||
-          fallbackDomVal;
+          pendingChanges.value[t.key] || rawJsonVal || fallbackDomVal;
       });
 
       modalState.initialValues = initials;
       modalState.open = true;
-    }
+    },
   );
 
   // ── Studio UI ───────────────────────────────────────────────────────────────
@@ -132,7 +125,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       const handleSave = (newTranslations: Record<string, string>) => {
         Object.assign(pendingChanges.value, newTranslations);
 
-        const i18n = (nuxtApp as unknown as { $i18n?: any }).$i18n;
+        const i18n = nuxtApp.$i18n;
         const currentLocale = i18n?.locale?.value || "en";
 
         if (i18n) {
@@ -143,7 +136,7 @@ export default defineNuxtPlugin((nuxtApp) => {
               updatedMessages,
               key,
               val,
-              config.isFlatJson
+              config.isFlatJson,
             );
             if (result) updatedMessages = result;
           });
@@ -218,7 +211,7 @@ export default defineNuxtPlugin((nuxtApp) => {
           if (fetchError.response?.status === 401) {
             logout();
             alert(
-              "Your GitHub token session expired or was rejected. Please authenticate again."
+              "Your GitHub token session expired or was rejected. Please authenticate again.",
             );
             isTokenModalOpen.value = true;
           }

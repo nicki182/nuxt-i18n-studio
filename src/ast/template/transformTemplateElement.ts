@@ -11,7 +11,13 @@ import type { ScriptVariableMap, PayloadEntry } from "../types";
 
 import { extractTemplateTranslations } from "./extractTemplateTranslations";
 
-export function transformTemplateElement(valueMap: ScriptVariableMap): NodeTransform {
+/**
+ *
+ * @param valueMap
+ */
+export function transformTemplateElement(
+  valueMap: ScriptVariableMap,
+): NodeTransform {
   return (node) => {
     if (node.type !== NodeTypes.ELEMENT) return;
     const el = node as ElementNode;
