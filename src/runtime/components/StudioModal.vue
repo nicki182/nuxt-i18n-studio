@@ -67,17 +67,23 @@ const handleSave = () => {
 }
 .i18n-modal-card {
   background: white;
-  padding: 24px;
+  padding: 1.5rem;
   border-radius: 12px;
-  width: 450px;
+  width: 28.125rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
 }
 .i18n-modal-header {
-  margin: 0 0 20px 0;
+  margin: 0 0 1.25rem 0;
   font-size: 1.25rem;
   color: #111827;
+  width: 100%;
 }
 .i18n-field-group {
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
+  width: 100%;
 }
 .i18n-label {
   display: block;
@@ -90,54 +96,14 @@ const handleSave = () => {
   font-weight: 400;
   color: #9ca3af;
   margin-left: 8px;
-}
-.i18n-input {
   width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 10px;
-  font-family: inherit;
-  font-size: 14px;
 }
 .i18n-modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  width: 100%;
 }
-.i18n-btn-primary {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-}
-.i18n-btn-secondary {
-  background: white;
-  border: 1px solid #d1d5db;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.i18n-options-group {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
-}
-.i18n-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #374151;
-  cursor: pointer;
-}
-.i18n-help-text {
-  margin: 4px 0 0 22px;
-  font-size: 12px;
-  color: #6b7280;
-}
+
 </style>

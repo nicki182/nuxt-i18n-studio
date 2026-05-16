@@ -31,7 +31,7 @@
     <button @click="isAdmin = !isAdmin">Toggle Admin State</button>
 
     <hr style="margin: 20px 0;" />
-
+    <p>{{ $t(getKey()) }}</p>
     <button @click="show = !show">show toast</button>
     <ToastTest v-if="show" @close="show = false" />
   </div>
@@ -56,5 +56,9 @@ const toggleDynamic = () => {
 
 const testOnClick = () => {
   console.log("Button clicked!");
+};
+
+const getKey = () => {
+  return "home.dynamic.first";
 };
 </script>

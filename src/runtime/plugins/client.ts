@@ -1,4 +1,7 @@
-import { render } from "vue";
+// ── client plugin ─────────────────────────────────────────────────────────────
+// Mounts the Studio UI, provides the open-modal function, handles save/publish.
+
+import { render, defineComponent, ref, reactive, h, nextTick, onMounted } from "vue";
 
 import type { FetchError } from "../types/error";
 import type { I18nInstance } from "../types/i18n";
@@ -11,29 +14,48 @@ import { useStudioEffects } from "../composables/useStudioEffects";
 import { useStudioToken } from "../composables/useStudioToken";
 import { updateJSON } from "../utils/updateJSON";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+// What the directive passes to openModal — one entry per unique key
+export interface TranslationEntry {
+  key: string;
+  usages: string[];    // ["text:dynamic", "attr:placeholder"]
+  source: "static" | "traced" | "runtime" | "prop";
+}
+
+type OpenModalFn = (
+  translations: TranslationEntry[],
+  el: HTMLElement
+) => void;
+
+// ── Plugin ────────────────────────────────────────────────────────────────────
+
 export default defineNuxtPlugin((nuxtApp) => {
   if (import.meta.server) return;
 
-  // ── STATE ─────────────────────────────────────────────────
+  // ── State ───────────────────────────────────────────────────────────────────
   const pendingChanges = ref<Record<string, string>>({});
   const isPublishing = ref(false);
   const isTokenModalOpen = ref(false);
   const clearOtherLocales = ref(false);
   const config = useRuntimeConfig().public.i18nStudio || {};
+
   const modalState = reactive({
     open: false,
-    translations: [] as { key: string; usages: string[] }[],
+    translations: [] as TranslationEntry[],
     targetElement: null as HTMLElement | null | undefined,
     initialValues: {} as Record<string, string>,
   });
 
-  // ── PROVIDE FOR UI COMPONENTS ─────────────────────────────
+  // ── open-modal provider ─────────────────────────────────────────────────────
+  // Provided via Vue's provide/inject so the directive can call it without
+  // needing a direct import (directive runs in a different plugin context).
   nuxtApp.vueApp.provide(
     "i18n-open-modal",
-    (translations: { key: string; usages: string[] }[], el?: HTMLElement) => {
+    (translations: TranslationEntry[], el: HTMLElement) => {
       modalState.translations = translations;
       modalState.targetElement = el;
-      console.log("Provided translations for modal:", translations, "Target element:", el);
+
       const i18n = (nuxtApp as unknown as { $i18n?: I18nInstance }).$i18n;
       const currentLocale = i18n?.locale?.value || "en";
       const messages = i18n?.getLocaleMessage?.(currentLocale) || {};
@@ -41,37 +63,34 @@ export default defineNuxtPlugin((nuxtApp) => {
       const initials: Record<string, string> = {};
 
       translations.forEach((t) => {
-        let rawJsonVal = "";
-
-        // 1. Get the raw value from the i18n instance safely
+        // Layer 1: look up the raw value from the i18n message store
         const resolved = t.key.split(".").reduce((o: unknown, k: string) => {
-          console.log(`Resolving key part "${k}" in`, o, messages);
-          // Safely traverse the object tree
-          if (o && typeof o === "object" && o !== null && k in o) {
+          if (o && typeof o === "object" && k in (o as object)) {
             return (o as Record<string, unknown>)[k];
           }
           return undefined;
         }, messages);
 
-        // 2. Safely check the types of the resolved value
+        let rawJsonVal = "";
+
         if (typeof resolved === "string") {
-          // It's a plain string
           rawJsonVal = resolved;
         } else if (
           resolved !== null &&
           typeof resolved === "object" &&
-          "loc" in resolved
+          "loc" in (resolved as object)
         ) {
-          // It's a Vue-i18n compiled message (Proxy/Function)
+          // Vue-i18n compiled message proxy
           const compiledObj = resolved as { loc?: { source?: string } };
           if (typeof compiledObj.loc?.source === "string") {
             rawJsonVal = compiledObj.loc.source;
           }
         }
 
+        // Layer 2: DOM fallback for text/attr usages
         let fallbackDomVal = "";
         t.usages.forEach((u) => {
-          if (u === "text") {
+          if (u === "text:dynamic" || u === "text") {
             const domVal = el?.textContent?.trim();
             if (domVal) fallbackDomVal = domVal;
           } else if (u.startsWith("attr:")) {
@@ -81,39 +100,35 @@ export default defineNuxtPlugin((nuxtApp) => {
           }
         });
 
-        // 3. Assign the initial value (make sure to use .translations here since we restructured it!)
         initials[t.key] =
-          pendingChanges.value[t.key] || // <--- Removed .translations
+          pendingChanges.value[t.key] ||
           rawJsonVal ||
           fallbackDomVal;
       });
 
       modalState.initialValues = initials;
       modalState.open = true;
-    },
+    }
   );
 
-  // ── MOUNT REACTIVE UI ─────────────────────────────────────
+  // ── Studio UI ───────────────────────────────────────────────────────────────
   const studioRoot = document.createElement("div");
   studioRoot.id = "i18n-studio-ui-root";
   document.body.appendChild(studioRoot);
 
   const StudioUI = defineComponent({
     setup() {
-      // Initialize our new secure token composable!
       const { isAuthenticated, checkAuth, login, logout } = useStudioToken();
-
       const { checkHmrAttached, markHmrAttached } = useStudioEffects(() => {
-        // This fires automatically when Ctrl+Shift+F turns Studio off
         modalState.open = false;
         isTokenModalOpen.value = false;
       });
 
       onMounted(() => {
-        // Check the server session cookie on mount
         if (!import.meta.dev) checkAuth();
       });
 
+      // ── Save (local, updates vue-i18n in-memory) ──────────────────────────
       const handleSave = (newTranslations: Record<string, string>) => {
         Object.assign(pendingChanges.value, newTranslations);
 
@@ -121,33 +136,27 @@ export default defineNuxtPlugin((nuxtApp) => {
         const currentLocale = i18n?.locale?.value || "en";
 
         if (i18n) {
-          // 1. Get the current messages from vue-i18n
           let updatedMessages = { ...i18n.getLocaleMessage(currentLocale) };
 
-          // 2. Loop through the changes and apply them using your smart helper
           Object.entries(newTranslations).forEach(([key, val]) => {
             const result = updateJSON(
               updatedMessages,
               key,
               val,
-              config.isFlatJson,
+              config.isFlatJson
             );
-
-            // If the helper successfully updated the object, keep the result
-            if (result) {
-              updatedMessages = result;
-            }
+            if (result) updatedMessages = result;
           });
 
-          // 3. Merge the fully updated object back into vue-i18n
           i18n.mergeLocaleMessage(currentLocale, updatedMessages);
         }
+
         modalState.open = false;
       };
 
+      // ── Publish (persists to locale files via server API) ─────────────────
       const saveTokenAndPublish = async (token: string) => {
         try {
-          // Attempt to login using the server endpoint
           await login(token);
           isTokenModalOpen.value = false;
           handlePublish(clearOtherLocales.value);
@@ -157,7 +166,6 @@ export default defineNuxtPlugin((nuxtApp) => {
       };
 
       async function handlePublish(clearLocales: boolean) {
-        // 1. Check our boolean reactive state (managed by cookie check)
         if (!isAuthenticated.value && !import.meta.dev) {
           clearOtherLocales.value = clearLocales;
           isTokenModalOpen.value = true;
@@ -168,8 +176,8 @@ export default defineNuxtPlugin((nuxtApp) => {
         const changesToApply = { ...pendingChanges.value };
         const i18n = (nuxtApp as unknown as { $i18n?: I18nInstance }).$i18n;
         const currentLocale = i18n?.locale?.value || "en";
+
         try {
-          // 2. We NO LONGER pass Authorization headers! The browser sends the secure cookie.
           const response = await $fetch<{
             success: boolean;
             json?: Record<string, unknown>;
@@ -196,24 +204,23 @@ export default defineNuxtPlugin((nuxtApp) => {
               }
             };
 
-            // HMR handled purely via module state now!
             if (import.meta.hot && !checkHmrAttached()) {
               markHmrAttached();
               import.meta.hot.on("vite:afterUpdate", hmrHandler);
             }
           }
+
           pendingChanges.value = {};
         } catch (err: unknown) {
           const fetchError = err as FetchError;
           console.error("Publish failed:", fetchError);
 
           if (fetchError.response?.status === 401) {
-            // 3. Clear the server session if unauthorized
             logout();
             alert(
-              "Your GitHub token session expired or was rejected. Please authenticate again.",
+              "Your GitHub token session expired or was rejected. Please authenticate again."
             );
-            isTokenModalOpen.value = true; // Re-open the modal
+            isTokenModalOpen.value = true;
           }
         } finally {
           isPublishing.value = false;
@@ -223,6 +230,8 @@ export default defineNuxtPlugin((nuxtApp) => {
       return () => [
         h(StudioModal, {
           isOpen: modalState.open,
+          // Pass full TranslationEntry shape — modal can now show source badges
+          // e.g. "traced from script" vs "resolved at runtime"
           translations: modalState.translations,
           targetElement: modalState.targetElement,
           initialValues: modalState.initialValues,
@@ -236,7 +245,7 @@ export default defineNuxtPlugin((nuxtApp) => {
           loading: isPublishing.value,
           onPublish: handlePublish,
           initialClearLocales: config.cleanOnValueChange,
-          isPublishingToGithub: !import.meta.dev, // Only show "to GitHub" in dev mode where the token modal is relevant
+          isPublishingToGithub: !import.meta.dev,
         }),
         h(I18nPageTranslations),
         h(GithubTokenModal, {

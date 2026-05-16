@@ -1,48 +1,52 @@
+import type { I18nHTMLElement } from "../types/i18nHTMLElement";
+
+import { useAST } from "../composables/useAST";
+import { useStudioState } from "../composables/useStudioState";
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type OpenModalFn = (
-  translations: { key: string; usages: string[] }[],
-  el: HTMLElement
+  translations: { key: string; usages: string[]; source: string }[],
+  el: HTMLElement,
 ) => void;
 
-// Safely evaluates functions, variables, and ternaries against the Vue component!
-const evaluateExpr = (expr: string, ctx: any): string | undefined => {
-  try {
-    return new Function("ctx", `with(ctx) { return ${expr}; }`)(ctx);
-  } catch (e) {
-    return undefined;
-  }
-};
+// ── Directive ─────────────────────────────────────────────────────────────────
 
 export default defineNuxtPlugin((nuxtApp) => {
   nuxtApp.vueApp.directive("i18n-studio", {
-    getSSRProps() { return {}; },
+    getSSRProps() {
+      return {};
+    },
 
     mounted(el: I18nHTMLElement, binding: any) {
-       el.setAttribute("data-i18n-studio", "true");
+      el.setAttribute("data-i18n-studio", "true");
+
+      const { getPageKeys } = useStudioState();
+      const { decodePayload, resolveUsages } = useAST();
 
       const loadUsages = () => {
         try {
           const raw = binding.value || "";
-          // Fallback handling in case of raw vs base64
-          const decoded = atob(raw.trim());
+          const payload = decodePayload(raw);
 
-          const usages: { key: string; type: string }[] = JSON.parse(decoded);
+          if (!payload.length) {
+            el.__i18nUsages = [];
+            return;
+          }
 
-          // Map and resolve expressions!
-          el.__i18nUsages = usages.map(u => {
-            let finalKey = u.key;
+          const resolved = resolveUsages(
+            payload,
+            binding.instance,
+            getPageKeys,
+          );
 
-            if (finalKey.startsWith("__EXPR__")) {
-              const expr = finalKey.replace("__EXPR__", "");
-              finalKey = evaluateExpr(expr, binding.instance) || "";
-            }
+          if (!resolved.length) {
+            delete el.__i18nUsages;
+            el.removeAttribute("data-i18n-studio");
+            return;
+          }
 
-            return { key: finalKey, type: u.type }}).filter(u => u.key && !u.key.startsWith("__EXPR__")); // Drop failed evaluations
-            if (el.__i18nUsages.length === 0) {
-              delete el.__i18nUsages; // Clean up if no valid usages
-              el.removeAttribute("data-i18n-studio");
-              }
-        } catch (e) {
+          el.__i18nUsages = resolved;
+        } catch {
           el.__i18nUsages = [];
         }
       };
@@ -51,57 +55,63 @@ export default defineNuxtPlugin((nuxtApp) => {
 
       const blockAndOpen = (e: Event) => {
         if (!document.body.classList.contains("i18n-studio-active")) return;
-
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        if (e.type === "click") {
-          // Re-evaluate on click in case reactive state (or function return) changed!
-          loadUsages();
+        if (e.type !== "click") return;
 
-          const map = new Map<string, Set<string>>();
+        // Re-evaluate on every click — reactive state may have changed
+        loadUsages();
 
-          (el.__i18nUsages || []).forEach(({ key, type }) => {
-            if (!key) return;
-            if (!map.has(key)) map.set(key, new Set());
-            map.get(key)!.add(type);
-          });
+        // Collapse to key → usages map, merging duplicate keys
+        const map = new Map<string, { usages: Set<string>; source: string }>();
 
-          const translations = Array.from(map.entries()).map(([key, usages]) => ({
+        (el.__i18nUsages || []).forEach(({ key, type, source }) => {
+          if (!key || key.endsWith("*")) return; // skip unresolved prefixes
+          if (!map.has(key)) map.set(key, { usages: new Set(), source });
+          map.get(key)!.usages.add(type);
+        });
+
+        const translations = Array.from(map.entries()).map(
+          ([key, { usages, source }]) => ({
             key,
             usages: Array.from(usages),
-          }));
+            source,
+          }),
+        );
 
-          const openModal = nuxtApp.vueApp._context.provides["i18n-open-modal"] as OpenModalFn | undefined;
-          if (openModal && translations.length > 0) {
-            openModal(translations, el);
-          }
+        const openModal = nuxtApp.vueApp._context.provides[
+          "i18n-open-modal"
+        ] as OpenModalFn | undefined;
+
+        if (openModal && translations.length > 0) {
+          openModal(translations, el);
         }
       };
 
       el.__i18nHandler = blockAndOpen;
+
       ["click", "mousedown", "mouseup", "submit"].forEach((event) => {
         el.addEventListener(event, blockAndOpen, { capture: true });
       });
     },
 
+    // Re-resolve when component state changes (reactive values, props)
     updated(el: I18nHTMLElement, binding: any) {
-      // Called when component state changes, so we can re-evaluate dynamic values
       try {
-        const raw = el.getAttribute("data-i18n-studio") || binding.value || "";
-        let decoded = raw;
-        if (!raw.startsWith("[")) decoded = atob(raw.trim());
+        const { getPageKeys } = useStudioState();
+        const { decodePayload, resolveUsages } = useAST();
+        const raw = binding.value || "";
+        const payload = decodePayload(raw);
 
-        const usages: { key: string; type: string }[] = JSON.parse(decoded);
-        el.__i18nUsages = usages.map(u => {
-          let finalKey = u.key;
-          if (finalKey.startsWith("__EXPR__")) {
-            finalKey = evaluateExpr(finalKey.replace("__EXPR__", ""), binding.instance) || "";
-          }
-          return { key: finalKey, type: u.type };
-        }).filter(u => u.key);
-      } catch (e) {}
+        if (!payload.length) return;
+
+        const resolved = resolveUsages(payload, binding.instance, getPageKeys);
+        el.__i18nUsages = resolved.length ? resolved : [];
+      } catch {
+        // Keep existing usages on error
+      }
     },
 
     unmounted(el: I18nHTMLElement) {
@@ -111,6 +121,8 @@ export default defineNuxtPlugin((nuxtApp) => {
           el.removeEventListener(event, handler, { capture: true });
         });
       }
+      delete el.__i18nUsages;
+      delete el.__i18nHandler;
     },
   });
 });

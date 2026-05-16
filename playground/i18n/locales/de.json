@@ -11,7 +11,5 @@
       "label": "This is a text 1"
     }
   },
-  "toast": {
-    "message": "This is a toast message 8"
-  }
+  "toast": {}
 }

@@ -35,6 +35,10 @@ export function useStudioState() {
     pageKeys.value = [];
   };
 
+  const getPageKeys = () => {
+    return pageKeys.value;
+  }
+
   return {
     isStudioMode,
     pageKeys,
@@ -42,5 +46,6 @@ export function useStudioState() {
     toggleMode,
     addKey,
     clearKeys,
+    getPageKeys,
   };
 }

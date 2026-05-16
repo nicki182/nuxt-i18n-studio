@@ -7,11 +7,57 @@
 .i18n-studio-active [data-i18n-studio="true"]:hover {
   outline: 2px solid #3b82f6 !important;
   background: rgba(59, 130, 246, 0.05) !important;
-  cursor:pointer !important;
+  cursor: pointer !important;
 }
 
 /* Freeze animations when Studio Mode is active */
 .i18n-frozen *:not(#i18n-studio-ui-root):not(#i18n-studio-ui-root *) {
   animation-play-state: paused !important;
   transition: none !important;
+}
+
+.i18n-btn-primary {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.i18n-btn-secondary {
+  background: white;
+  border: 1px solid #d1d5db;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.i18n-options-group {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+.i18n-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+.i18n-help-text {
+  margin: 4px 0 0 1.375rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.i18n-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
 }
