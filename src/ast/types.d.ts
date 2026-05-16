@@ -1,7 +1,7 @@
 import type { Plugin } from "vite";
 // identifier/function name → all possible string values it can return/hold
 // "__PROP__" sentinel means: value comes from a parent prop
-export type ValueMap = Map<string, string[]>;
+export type ScriptVariableMap = Map<string, string[]>;
 
 export type ExtractedKey =
   | { type: "static"; key: string; id: `__STATIC__${string}` }
@@ -29,7 +29,7 @@ export interface HarvestedValue {
 export type ReturnHarvestedValue = HarvestedValue[];
 
 export interface ASTPlugin extends Plugin {
-  _valueMapCache: Map<string, ValueMap>;
+  _valueMapCache: Map<string, ScriptVariableMap>;
 }
 
 export type PayloadEntry = ExtractedKey & { usageType: string };

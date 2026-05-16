@@ -1,4 +1,4 @@
-import type { ReturnHarvestedValue } from "../types";
+import type { ReturnHarvestedValue } from "../../types";
 
 import { harvestFunctionReturns } from "./harvestFromFunctionReturns";
 import { harvestLiterals } from "./harvestFromLiterals";

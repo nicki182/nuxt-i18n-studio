@@ -1,10 +1,14 @@
-import type { ValueMap, ExtractedKey } from "../types";
+import type { ValueMap, ExtractedKey } from "../../types";
 
 export function resolveCallExpression(args: {
   node: any;
   rawSource: string;
   valueMap: ValueMap;
-  resolver: (args: { node: any; rawSource: string; valueMap: ValueMap }) => ExtractedKey[];
+  resolver: (args: {
+    node: any;
+    rawSource: string;
+    valueMap: ValueMap;
+  }) => ExtractedKey[];
 }): ExtractedKey[] {
   const { node, rawSource, valueMap } = args;
 
@@ -32,7 +36,14 @@ export function resolveCallExpression(args: {
       return [{ type: "static", key, id: `__STATIC__${key}` }];
     }
 
-    return [{ type: "dynamic", expr: rawSource, candidates: [], id: `__EXPR__${rawSource}` }];
+    return [
+      {
+        type: "dynamic",
+        expr: rawSource,
+        candidates: [],
+        id: `__EXPR__${rawSource}`,
+      },
+    ];
   } // ← join block ends here
 
   // getKey() — resolve function name against valueMap
@@ -40,15 +51,26 @@ export function resolveCallExpression(args: {
     node.callee?.type === "Identifier"
       ? node.callee.name
       : node.callee?.type === "MemberExpression"
-      ? node.callee.property?.name
-      : null;
+        ? node.callee.property?.name
+        : null;
 
   if (fnName) {
     const candidates = valueMap.get(fnName);
     if (candidates && candidates[0] !== "__PROP__" && candidates.length) {
-      return candidates.map((c) => ({ type: "static" as const, key: c, id: `__STATIC__${c}` }));
+      return candidates.map((c) => ({
+        type: "static" as const,
+        key: c,
+        id: `__STATIC__${c}`,
+      }));
     }
   }
 
-  return [{ type: "dynamic", expr: rawSource, candidates: [], id: `__EXPR__${rawSource}` }];
+  return [
+    {
+      type: "dynamic",
+      expr: rawSource,
+      candidates: [],
+      id: `__EXPR__${rawSource}`,
+    },
+  ];
 }

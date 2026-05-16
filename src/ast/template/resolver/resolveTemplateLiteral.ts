@@ -1,4 +1,4 @@
-import type { ExtractedKey, ValueMap } from "../types";
+import type { ExtractedKey, ValueMap } from "../../types";
 
 export function resolveTemplateLiteral(args: {
   node: any;

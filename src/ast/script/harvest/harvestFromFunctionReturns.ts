@@ -1,10 +1,13 @@
 import { walk } from "zimmerframe";
 
-import type { ReturnHarvestedValue } from "../types";
+import type { ReturnHarvestedValue } from "../../types";
 
 import { harvestLiterals } from "./harvestFromLiterals";
 
-export function harvestFunctionReturns(fnNode: any, name: string): ReturnHarvestedValue {
+export function harvestFunctionReturns(
+  fnNode: any,
+  name: string,
+): ReturnHarvestedValue {
   const body = fnNode.body;
   if (!body) return [] as ReturnHarvestedValue;
 

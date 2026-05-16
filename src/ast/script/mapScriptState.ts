@@ -1,13 +1,13 @@
 import { walk } from "zimmerframe";
 
-import type { ValueMap } from "./types";
+import type { ScriptVariableMap } from "../types";
 
+import { addToMap } from "../helper";
+import { TSParser } from "../parser";
 import { harvestValuesByNodeType } from "./harvest";
-import { addToMap } from "./helper";
-import { TSParser } from "./parser";
 
-export function buildScriptValueMap(scriptCode: string): ValueMap {
-  const map: ValueMap = new Map();
+export function mapScriptState(scriptCode: string): ScriptVariableMap {
+  const map: ScriptVariableMap = new Map();
   try {
     const ast = TSParser.parse(scriptCode, {
       ecmaVersion: "latest",
@@ -38,7 +38,7 @@ export function buildScriptValueMap(scriptCode: string): ValueMap {
     return map;
   } catch (e) {
     console.log(
-      "[i18n Studio] buildScriptValueMap: FAILED to parse script code:",
+      "[i18n Studio] analyzeScriptState: FAILED to parse script code:",
       e,
     );
     return map;

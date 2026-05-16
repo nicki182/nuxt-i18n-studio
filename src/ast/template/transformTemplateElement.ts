@@ -7,11 +7,11 @@ import type {
 
 import { NodeTypes } from "@vue/compiler-dom";
 
-import type { ValueMap, PayloadEntry } from "./types";
+import type { ScriptVariableMap, PayloadEntry } from "../types";
 
-import { extractI18nArguments } from "./extractI18nArguments";
+import { extractTemplateTranslations } from "./extractTemplateTranslations";
 
-export function buildNodeTransform(valueMap: ValueMap): NodeTransform {
+export function transformTemplateElement(valueMap: ScriptVariableMap): NodeTransform {
   return (node) => {
     if (node.type !== NodeTypes.ELEMENT) return;
     const el = node as ElementNode;
@@ -37,7 +37,7 @@ export function buildNodeTransform(valueMap: ValueMap): NodeTransform {
       const interp = childNode as InterpolationNode;
       const expression = interp.content?.loc?.source;
       if (expression) {
-        for (const entry of extractI18nArguments(expression, valueMap)) {
+        for (const entry of extractTemplateTranslations(expression, valueMap)) {
           payloadEntries.push({ ...entry, usageType: "text:dynamic" });
         }
       }
@@ -54,7 +54,7 @@ export function buildNodeTransform(valueMap: ValueMap): NodeTransform {
           : "unknown";
       const expression = prop.exp.loc?.source;
       if (expression) {
-        for (const entry of extractI18nArguments(expression, valueMap)) {
+        for (const entry of extractTemplateTranslations(expression, valueMap)) {
           payloadEntries.push({ ...entry, usageType: `attr:${attrName}` });
         }
       }

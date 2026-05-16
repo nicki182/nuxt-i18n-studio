@@ -1,4 +1,4 @@
-import type { ValueMap, ExtractedKey } from "../types";
+import type { ValueMap, ExtractedKey } from "../../types";
 
 import { resolveCallExpression } from "./resolveCallExpression";
 import { resolveConditionalExpression } from "./resolveConditionalExpression";
@@ -20,7 +20,7 @@ export function nodeResolver(args: {
   node: any;
   rawSource: string;
   valueMap: ValueMap;
-}): ExtractedKey[]  {
+}): ExtractedKey[] {
   const { node } = args;
   if (!node) return [];
 
@@ -28,7 +28,7 @@ export function nodeResolver(args: {
   if (resolver) {
     return resolver({
       ...args,
-      resolver:nodeResolver,
+      resolver: nodeResolver,
     });
   }
   return [];

@@ -1,9 +1,6 @@
-import type { ReturnHarvestedValue } from "../types";
+import type { ReturnHarvestedValue } from "../../types";
 
-export function harvestLiterals(
-  node: any,
-  name: string,
-): ReturnHarvestedValue {
+export function harvestLiterals(node: any, name: string): ReturnHarvestedValue {
   if (!node) return [] as ReturnHarvestedValue;
 
   if (node.type === "Literal" && typeof node.value === "string") {
@@ -26,7 +23,7 @@ export function harvestLiterals(
 
   if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
     const full = node.quasis.map((q: any) => q.value.cooked).join("");
-    return full ? [{ value: full, name }] : [] as ReturnHarvestedValue;
+    return full ? [{ value: full, name }] : ([] as ReturnHarvestedValue);
   }
 
   return [] as ReturnHarvestedValue;

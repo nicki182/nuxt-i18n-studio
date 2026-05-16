@@ -1,4 +1,4 @@
-import type { ReturnHarvestedValue } from "../types";
+import type { ReturnHarvestedValue } from "../../types";
 
 import { harvestFromAssignmentExpression } from "./harvestFromAssignmentExpression";
 import { harvestFromCallExpression } from "./harvestFromCallExpression";

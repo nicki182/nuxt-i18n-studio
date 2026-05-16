@@ -1,4 +1,4 @@
-import type { ExtractedKey, ValueMap } from "../types";
+import type { ExtractedKey, ValueMap } from "../../types";
 
 export function resolveIdentifier(args: {
   node: any;
@@ -10,7 +10,14 @@ export function resolveIdentifier(args: {
   const candidates = valueMap.get(name);
 
   if (!candidates) {
-    return [{ type: "dynamic", expr: rawSource, candidates: [], id: `__EXPR__${rawSource}` }];
+    return [
+      {
+        type: "dynamic",
+        expr: rawSource,
+        candidates: [],
+        id: `__EXPR__${rawSource}`,
+      },
+    ];
   }
 
   if (candidates[0] === "__PROP__") {
@@ -21,7 +28,7 @@ export function resolveIdentifier(args: {
     type: "traced",
     key: candidates[0],
     allCandidates: [...candidates],
-    id: `__TRACED__${candidates[0]}`
+    id: `__TRACED__${candidates[0]}`,
   });
   candidates.forEach((c) => {
     results.push({ type: "static", key: c, id: `__STATIC__${c}` });

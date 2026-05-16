@@ -7,7 +7,7 @@ import {
   useLogger,
 } from "@nuxt/kit";
 
-import { ASTPlugin, createNodeTransform } from "./ast";
+import { ASTPlugin, createTemplateNodeTransform } from "./ast";
 
 export default defineNuxtModule({
   meta: {
@@ -54,7 +54,7 @@ export default defineNuxtModule({
       nuxt.options.vue.compilerOptions.nodeTransforms || [];
 
     nuxt.options.vue.compilerOptions.nodeTransforms.unshift(
-      createNodeTransform(vitePlugin),
+      createTemplateNodeTransform(vitePlugin),
     );
 
     // ── REGISTRATIONS ──────────────────────────────────────────────────────────

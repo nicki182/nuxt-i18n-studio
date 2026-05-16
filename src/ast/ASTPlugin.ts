@@ -1,7 +1,7 @@
-import type { ASTPlugin, ValueMap } from "./types";
+import type { ASTPlugin, ScriptVariableMap } from "./types";
 
-import { buildScriptValueMap } from "./buildScriptValueMap";
 import { parseSfc } from "./parseSfc";
+import { mapScriptState } from "./script/mapScriptState";
 
 // ── Vite Plugin ───────────────────────────────────────────────────────────────
 // Vite's transform() hook receives the full raw .vue source before any
@@ -11,7 +11,7 @@ import { parseSfc } from "./parseSfc";
 export function ASTPlugin(): ASTPlugin {
   // Per-file cache: absolute path → valueMap
   // Invalidated on HMR so edits to script variables are picked up immediately
-  const valueMapCache = new Map<string, ValueMap>();
+  const valueMapCache = new Map<string, ScriptVariableMap>();
 
   return {
     name: "vite-plugin-ast-i18n-studio",
@@ -27,7 +27,7 @@ export function ASTPlugin(): ASTPlugin {
       valueMapCache.set(
         id,
         scriptContent
-          ? buildScriptValueMap(scriptContent)
+          ? mapScriptState(scriptContent)
           : new Map<string, string[]>(),
       );
       // Don't transform source — just populate the cache.

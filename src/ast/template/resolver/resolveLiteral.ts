@@ -1,4 +1,4 @@
-import type { ExtractedKey } from "../types";
+import type { ExtractedKey } from "../../types";
 
 export function resolveLiteral(args: { node: any }): ExtractedKey[] {
   const { node } = args;
