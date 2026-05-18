@@ -16,8 +16,9 @@ import { nodeResolver } from "./resolver";
  * Parses a JS expression string from a template interpolation or directive
  * binding, finds all $t() / t() calls, and resolves their arguments to
  * ExtractedKey values using the ScriptVariableMap for context.
- * @param code
- * @param valueMap
+ * @param code The raw JavaScript expression code to analyze, typically from a template interpolation or directive binding.
+ * @param valueMap An optional map of script variables that can be used to resolve identifiers to their values. This is typically populated from the Vite transform hook for the current file.
+ * @returns An array of extracted keys, where each key is an object containing the resolved value and associated metadata.
  */
 export function extractTemplateTranslations(
   code: string,

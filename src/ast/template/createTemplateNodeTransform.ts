@@ -8,7 +8,7 @@ import { transformTemplateElement } from "./transformTemplateElement";
  * Wires the Vite plugin's per-file ScriptVariableMap cache to the Vue
  * compiler node transform. The cache is populated during the Vite transform
  * hook and read here by context.filename.
- * @param vitePlugin
+ * @param vitePlugin The Vite plugin instance containing the per-file ScriptVariableMap cache.
  */
 export function createTemplateNodeTransform(
   vitePlugin: ASTPlugin,

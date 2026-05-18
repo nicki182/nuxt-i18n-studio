@@ -8,17 +8,15 @@ import type {
 
 import type { ScriptVariableMap, ExtractedKey } from "../../types";
 
-import { KeyExtractionType } from "../../types";
+import { KeyExtractionType } from "../../constants";
 
 /**
- * Resolves a CallExpression node from a $t() argument to all possible
- * ExtractedKey values. Handles two cases:
- * - ['a', 'b'].join('.') — reconstructs the joined string statically
- * - getKey()             — resolves the function name against the ScriptVariableMap
- * @param args
- * @param args.node
- * @param args.rawSource
- * @param args.valueMap
+ * Resolves a CallExpression node from a $t() argument to all possible ExtractedKey values.
+ * @param args An object containing the CallExpression node, the raw source code, and a map of script variables.
+ * @param args.node The CallExpression node to resolve.
+ * @param args.rawSource The raw source code of the script, which may be used for context or fallback values.
+ * @param args.valueMap A map of script variables that can be used to resolve function names to their values.
+ * @returns An array of extracted keys, where each key is an object containing the resolved value and associated metadata.
  */
 export function resolveCallExpression(args: {
   node: CallExpression;

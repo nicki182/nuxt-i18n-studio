@@ -20,7 +20,6 @@ const nodeTypeToHarvester: HarvesterMap = {
  * If no harvester is defined for the node type, it returns an empty array.
  * Each harvester function is responsible for checking if the node matches the
  * expected pattern and returning harvested values or undefined if not applicable.
- *
  * @param node - The ESTree node to harvest values from
  * @returns An array of harvested values extracted from the node, or empty if none found
  */

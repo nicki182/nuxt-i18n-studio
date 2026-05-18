@@ -17,8 +17,9 @@ import { harvestFunctionReturns } from "./harvestFromFunctionReturns";
 import { harvestLiterals } from "./harvestFromLiterals";
 
 /**
- *
- * @param node
+ * Harvests return values from a VariableDeclarator, handling various initialization patterns such as ref/reactive calls, string literals, and function expressions.
+ * @param node The VariableDeclarator node to harvest from.
+ * @returns The harvested return value, or undefined if not applicable.
  */
 export function harvestFromVariableDeclarator(
   node: VariableDeclarator,

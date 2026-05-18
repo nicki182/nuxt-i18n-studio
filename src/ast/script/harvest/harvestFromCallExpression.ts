@@ -12,8 +12,9 @@ import type {
 import type { ReturnHarvestedValue } from "../../types";
 
 /**
- *
- * @param node
+ * Harvests return values from a CallExpression, specifically targeting defineProps calls.
+ * @param node The CallExpression node to harvest from.
+ * @returns The harvested return value, or undefined if not applicable.
  */
 export function harvestFromCallExpression(
   node: CallExpression,

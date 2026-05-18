@@ -9,8 +9,9 @@ import type { ReturnHarvestedValue } from "../../types";
 import { harvestLiterals } from "./harvestFromLiterals";
 
 /**
- *
- * @param node
+ * Harvests return values from an AssignmentExpression.
+ * @param node The AssignmentExpression node to harvest from.
+ * @returns The harvested return value, or undefined if not applicable.
  */
 export function harvestFromAssignmentExpression(
   node: AssignmentExpression,

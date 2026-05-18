@@ -54,7 +54,6 @@ const handleSave = () => {
 </script>
 
 <style scoped>
-/* Keep all your existing styles... */
 .i18n-modal-overlay {
   position: fixed;
   inset: 0;
@@ -105,5 +104,4 @@ const handleSave = () => {
   margin-top: 1.5rem;
   width: 100%;
 }
-
 </style>

@@ -1,5 +1,10 @@
 import { useStudioState } from "../composables/useStudioState";
 
+/**
+ * Nuxt plugin that overrides the global $t function to track i18n keys used in templates.
+ * It hooks into the app creation to replace the $t function so it can capture keys whenever $t is called.
+ * It also hooks into page navigation to clear the tracked keys when navigating to a new page.
+ */
 export default defineNuxtPlugin((nuxtApp) => {
   if (import.meta.server || !import.meta.dev) return;
 

@@ -1,32 +1,27 @@
-import type { ComponentPublicInstance } from "vue";
-
-import type { ExtractedKey, ResolvedEntry, EntryResolver } from "../types/ast";
+import type { ExtractedKey } from "../types/ast";
 import type { ResolvedUsage } from "../types/i18nHTMLElement";
 
-// Payload injected by the compiler includes the usageType
-type PayloadEntry = ExtractedKey & { usageType?: string };
+// ── useAST ────────────────────────────────────────────────────────────────────
+// Composable that handles decoding and resolving the i18n-studio directive
+// payload at runtime. All resolution is CSP-safe — no eval, no new Function.
+//
+// Resolution priority per entry type:
+//   declared → static analysis → traced → prefix match → runtime $t harvest
+//
+// For prop and dynamic entries where static analysis couldn't resolve the key,
+// developers should add data-i18n-keys="key.one,key.two" to the element.
+// Those entries arrive as "declared" type and take priority.
 
-/**
- *
- */
-export function useAST() {
-  const evaluateExpr = (
-    expr: string,
-    ctx: ComponentPublicInstance | null,
-  ): string | undefined => {
-    if (!ctx) return undefined;
-    try {
-      return new Function("ctx", `with(ctx) { return ${expr}; }`)(ctx);
-    } catch {
-      return undefined;
-    }
-  };
+export const useAST = () => {
+  // ── Payload decoder ─────────────────────────────────────────────────────────
 
-  const decodePayload = (raw: string): PayloadEntry[] => {
+  const decodePayload = (raw: string): ExtractedKey[] => {
     try {
+      // Vue's runtime strips surrounding quotes from binding values but
+      // we defensively clean them in case the raw string arrives quoted
       const clean = raw.trim().replace(/^['"]|['"]$/g, "");
       const decoded = atob(clean);
-      return JSON.parse(decoded) as PayloadEntry[];
+      return JSON.parse(decoded) as ExtractedKey[];
     } catch {
       return [];
     }
@@ -34,12 +29,30 @@ export function useAST() {
 
   // ── Entry Resolvers ───────────────────────────────────────────────────────
 
+  type ResolvedEntry = Omit<ResolvedUsage, "type"> & { usageType: string };
+
+  type EntryResolver<T extends ExtractedKey> = (args: {
+    entry: T;
+    usageType: string;
+    getPageKeys: () => string[];
+  }) => ResolvedEntry[];
+
+  // Declared via data-i18n-keys attribute — developer knows best
+  // Highest priority, always shown first
+  const resolveDeclared: EntryResolver<
+    Extract<ExtractedKey, { type: "static" }>
+  > = ({ entry, usageType }) => {
+    return [{ key: entry.key, usageType, source: "static" }];
+  };
+
+  // Static literal — $t('home.title'), getKey(), ternary branches
   const resolveStatic: EntryResolver<
     Extract<ExtractedKey, { type: "static" }>
   > = ({ entry, usageType }) => {
     return [{ key: entry.key, usageType, source: "static" }];
   };
 
+  // Traced from script — ref with multiple .value assignments
   const resolveTraced: EntryResolver<
     Extract<ExtractedKey, { type: "traced" }>
   > = ({ entry, usageType }) => {
@@ -50,6 +63,8 @@ export function useAST() {
     }));
   };
 
+  // Prefix from template literal — `errors.${code}`
+  // Cross-references the runtime $t harvest to find matching keys
   const resolvePrefix: EntryResolver<
     Extract<ExtractedKey, { type: "prefix" }>
   > = ({ entry, usageType, getPageKeys }) => {
@@ -63,49 +78,49 @@ export function useAST() {
         source: "runtime" as const,
       }));
     }
+    // Fallback: show the prefix itself so editor knows something is there
     return [{ key: `${entry.prefix}*`, usageType, source: "runtime" as const }];
   };
 
+  // Prop — value comes from parent, couldn't be statically resolved.
+  // No eval — falls back to runtime $t harvest.
+  // Encourage developer to add data-i18n-keys to the element instead.
   const resolveProp: EntryResolver<Extract<ExtractedKey, { type: "prop" }>> = ({
-    entry,
     usageType,
     getPageKeys,
-    bindingInstance,
   }) => {
-    const results: ResolvedEntry[] = [];
-    const evaled = evaluateExpr(entry.propName, bindingInstance);
-    if (evaled) results.push({ key: evaled, usageType, source: "prop" });
-    getPageKeys().forEach((k) =>
-      results.push({ key: k, usageType, source: "runtime" }),
-    );
-    return results;
+    return getPageKeys().map((k) => ({
+      key: k,
+      usageType,
+      source: "runtime" as const,
+    }));
   };
 
+  // Dynamic — unknown expression, no static trace found.
+  // No eval — falls back to runtime $t harvest.
+  // Encourage developer to add data-i18n-keys to the element instead.
   const resolveDynamic: EntryResolver<
     Extract<ExtractedKey, { type: "dynamic" }>
-  > = ({ entry, usageType, getPageKeys, bindingInstance }) => {
-    const results: ResolvedEntry[] = [];
-    const evaled = evaluateExpr(entry.expr, bindingInstance);
+  > = ({ entry, usageType, getPageKeys }) => {
+    const runtimeKeys = getPageKeys();
 
-    if (evaled) {
-      results.push({ key: evaled, usageType, source: "runtime" });
-      getPageKeys()
-        .filter((k) => k === evaled || k.startsWith(evaled.split(".")[0] ?? ""))
-        .forEach((k) => results.push({ key: k, usageType, source: "runtime" }));
-    } else if (entry.candidates?.length) {
-      entry.candidates.forEach((k) =>
-        results.push({ key: k, usageType, source: "traced" }),
-      );
-    } else {
-      getPageKeys().forEach((k) =>
-        results.push({ key: k, usageType, source: "runtime" }),
-      );
+    // If we have pre-resolved candidates from the extractor use those
+    if (entry.candidates?.length) {
+      return entry.candidates.map((k) => ({
+        key: k,
+        usageType,
+        source: "traced" as const,
+      }));
     }
 
-    return results;
+    // Fall back to full runtime harvest
+    return runtimeKeys.map((k) => ({
+      key: k,
+      usageType,
+      source: "runtime" as const,
+    }));
   };
 
-  // We use `unknown` here because the types of `entry` branch based on `entry.type` inside the specific resolver
   const entryTypeResolver: Record<
     string,
     EntryResolver<Extract<ExtractedKey, { type: ExtractedKey }>>
@@ -123,23 +138,31 @@ export function useAST() {
     dynamic: resolveDynamic as EntryResolver<
       Extract<ExtractedKey, { type: "dynamic" }>
     >,
+    declared: resolveDeclared as EntryResolver<
+      Extract<ExtractedKey, { type: "static" }>
+    >,
   };
 
-  // ── resolveUsages ─────────────────────────────────────────────────────────
+  // ── resolveUsages ───────────────────────────────────────────────────────────
 
   const resolveUsages = (
-    payload: PayloadEntry[],
-    bindingInstance: ComponentPublicInstance | null,
+    payload: ExtractedKey[],
     getPageKeys: () => string[],
   ): ResolvedUsage[] => {
     const seen = new Set<string>();
+
     return payload
       .flatMap((entry) => {
-        const usageType = entry.usageType ?? "text:dynamic";
-        const resolver = entryTypeResolver[entry.type];
-        return (
-          resolver?.({ entry, usageType, getPageKeys, bindingInstance }) ?? []
-        );
+        const usageType =
+          (entry as ExtractedKey & { usageType?: string }).usageType ??
+          "text:dynamic";
+
+        // "declared" entries use the static resolver — they arrive as
+        // type: "static" with usageType: "declared" from the node transform
+        const resolverKey = usageType === "declared" ? "declared" : entry.type;
+        const resolver = entryTypeResolver[resolverKey];
+
+        return resolver?.({ entry, usageType, getPageKeys }) ?? [];
       })
       .filter(({ key, usageType }) => {
         if (!key || seen.has(`${key}::${usageType}`)) return false;
@@ -152,5 +175,5 @@ export function useAST() {
       })) as ResolvedUsage[];
   };
 
-  return { evaluateExpr, decodePayload, resolveUsages };
-}
+  return { decodePayload, resolveUsages };
+};

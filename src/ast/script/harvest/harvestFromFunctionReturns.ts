@@ -14,9 +14,10 @@ import type { ReturnHarvestedValue } from "../../types";
 import { harvestLiterals } from "./harvestFromLiterals";
 
 /**
- *
- * @param fnNode
- * @param name
+ * Harvests return values from a function-like node (FunctionDeclaration, FunctionExpression, or ArrowFunctionExpression).
+ * @param fnNode The function node to harvest from.
+ * @param name The name to associate with harvested values (e.g., function name).
+ * @returns An array of harvested return values.
  */
 export function harvestFunctionReturns(
   fnNode: FunctionExpression | ArrowFunctionExpression | FunctionDeclaration,

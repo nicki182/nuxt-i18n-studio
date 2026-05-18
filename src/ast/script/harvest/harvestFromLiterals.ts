@@ -11,9 +11,10 @@ import type {
 import type { ReturnHarvestedValue } from "../../types";
 
 /**
- *
- * @param node
- * @param name
+ * Harvests string literals from various expression types, including conditionals and templates.
+ * @param node The AST node to harvest from, which can be a Literal, ConditionalExpression, LogicalExpression, TemplateLiteral, ReturnStatement, BlockStatement, or any Expression.
+ * @param name The name to associate with harvested values (e.g., variable or function name).
+ * @returns An array of harvested return values, each containing the string value and associated name.
  */
 export function harvestLiterals(
   node:

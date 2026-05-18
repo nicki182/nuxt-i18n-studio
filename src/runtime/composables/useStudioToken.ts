@@ -4,7 +4,8 @@ import { ref } from "vue";
 const isAuthenticated = ref(false);
 
 /**
- *
+ * Composable that provides functions for managing authentication with GitHub, including checking for an existing valid session, logging in by sending a token to the server, and logging out by clearing the session cookie. The composable abstracts away the details of how authentication is handled on the server and provides a simple interface for runtime components to use when they need to verify authentication status or perform login/logout actions.
+ * @returns An object containing the isAuthenticated reactive reference and the checkAuth, login, and logout functions for managing authentication.
  */
 export function useStudioToken() {
   /**

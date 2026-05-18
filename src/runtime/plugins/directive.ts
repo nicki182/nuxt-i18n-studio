@@ -1,30 +1,42 @@
-import type { DirectiveBinding, ComponentPublicInstance } from "vue";
-
-import type { TranslationEntry, KeyExtractionType } from "../types/ast";
-import type { I18nHTMLElement } from "../types/i18nHTMLElement";
-
 import { useAST } from "../composables/useAST";
 import { useStudioState } from "../composables/useStudioState";
 
-type OpenModalFn = (translations: TranslationEntry[], el: HTMLElement) => void;
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ResolvedUsage {
+  key: string;
+  type: string; // "text:dynamic" | "attr:placeholder" | "declared" | etc.
+  source: "static" | "traced" | "runtime" | "prop";
+}
+
+interface I18nHTMLElement extends HTMLElement {
+  __i18nUsages?: ResolvedUsage[];
+  __i18nHandler?: (e: Event) => void;
+}
+
+type OpenModalFn = (
+  translations: { key: string; usages: string[]; source: string }[],
+  el: HTMLElement,
+) => void;
 
 // ── Directive ─────────────────────────────────────────────────────────────────
 
 export default defineNuxtPlugin((nuxtApp) => {
+  const { decodePayload, resolveUsages } = useAST();
+
   nuxtApp.vueApp.directive("i18n-studio", {
     getSSRProps() {
       return {};
     },
 
-    mounted(el: I18nHTMLElement, binding: DirectiveBinding<string>) {
+    mounted(el: I18nHTMLElement, binding: { value: string }) {
       el.setAttribute("data-i18n-studio", "true");
 
       const { getPageKeys } = useStudioState();
-      const { decodePayload, resolveUsages } = useAST();
 
       const loadUsages = () => {
         try {
-          const raw = binding.value || "";
+          const raw = binding.value ?? "";
           const payload = decodePayload(raw);
 
           if (!payload.length) {
@@ -32,11 +44,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             return;
           }
 
-          const resolved = resolveUsages(
-            payload,
-            binding.instance as ComponentPublicInstance | null,
-            getPageKeys,
-          );
+          const resolved = resolveUsages(payload, getPageKeys);
 
           if (!resolved.length) {
             delete el.__i18nUsages;
@@ -44,7 +52,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             return;
           }
 
-          el.__i18nUsages = resolved;
+          el.__i18nUsages = resolved as ResolvedUsage[];
         } catch {
           el.__i18nUsages = [];
         }
@@ -60,27 +68,20 @@ export default defineNuxtPlugin((nuxtApp) => {
 
         if (e.type !== "click") return;
 
-        // Re-evaluate on every click — reactive state may have changed
+        // Re-resolve on every click — runtime $t harvest may have grown
         loadUsages();
 
         // Collapse to key → usages map, merging duplicate keys
-        const map = new Map<
-          string,
-          { usages: Set<string>; source: KeyExtractionType }
-        >();
+        const map = new Map<string, { usages: Set<string>; source: string }>();
 
-        (el.__i18nUsages || []).forEach(({ key, type, source }) => {
-          if (!key || key.endsWith("*")) return; // skip unresolved prefixes
-
-          if (!map.has(key))
-            map.set(key, {
-              usages: new Set(),
-              source: source as KeyExtractionType,
-            });
+        (el.__i18nUsages ?? []).forEach(({ key, type, source }) => {
+          // Skip unresolved prefix wildcards — e.g. "errors.*"
+          if (!key || key.endsWith("*")) return;
+          if (!map.has(key)) map.set(key, { usages: new Set(), source });
           map.get(key)!.usages.add(type);
         });
 
-        const translations: TranslationEntry[] = Array.from(map.entries()).map(
+        const translations = Array.from(map.entries()).map(
           ([key, { usages, source }]) => ({
             key,
             usages: Array.from(usages),
@@ -104,22 +105,17 @@ export default defineNuxtPlugin((nuxtApp) => {
       });
     },
 
-    // Re-resolve when component state changes (reactive values, props)
-    updated(el: I18nHTMLElement, binding: DirectiveBinding<string>) {
+    // Re-resolve when component state changes
+    updated(el: I18nHTMLElement, binding: { value: string }) {
       try {
         const { getPageKeys } = useStudioState();
-        const { decodePayload, resolveUsages } = useAST();
-        const raw = binding.value || "";
+        const raw = binding.value ?? "";
         const payload = decodePayload(raw);
 
         if (!payload.length) return;
 
-        const resolved = resolveUsages(
-          payload,
-          binding.instance as ComponentPublicInstance | null,
-          getPageKeys,
-        );
-        el.__i18nUsages = resolved.length ? resolved : [];
+        const resolved = resolveUsages(payload, getPageKeys);
+        el.__i18nUsages = resolved.length ? (resolved as ResolvedUsage[]) : [];
       } catch {
         // Keep existing usages on error
       }

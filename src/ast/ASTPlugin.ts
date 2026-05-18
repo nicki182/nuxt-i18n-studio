@@ -3,13 +3,12 @@ import type { ASTPlugin, ScriptVariableMap } from "./types";
 import { parseSfc } from "./parseSfc";
 import { mapScriptState } from "./script/mapScriptState";
 
-// ── Vite Plugin ───────────────────────────────────────────────────────────────
-// Vite's transform() hook receives the full raw .vue source before any
-// compilation — so we can parse the script block, build the valueMap, and
-// cache it keyed by file ID for the nodeTransform to read.
-
 /**
- *
+ * Vite Plugin:
+ * Vite's transform() hook receives the full raw .vue source before any
+ * compilation — so we can parse the script block, build the valueMap, and
+ * cache it keyed by file ID for the nodeTransform to read.
+ * @returns An object conforming to the ASTPlugin interface that can be used as a Vite plugin.
  */
 export function ASTPlugin(): ASTPlugin {
   // Per-file cache: absolute path → valueMap

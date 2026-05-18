@@ -19,8 +19,6 @@ export function mapScriptState(scriptCode: string): ScriptVariableMap {
   const map: ScriptVariableMap = new Map();
 
   try {
-    // acorn returns its own Node type — cast to estree Program so zimmerframe
-    // and our estree-typed harvesters work without further casts downstream
     const ast = TSParser.parse(scriptCode, {
       ecmaVersion: "latest",
       sourceType: "module",

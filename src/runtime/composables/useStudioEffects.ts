@@ -5,8 +5,12 @@ import { useStudioState } from "./useStudioState";
 let isHmrAttached = false;
 
 /**
- *
- * @param onToggleOff
+ * Composable that manages the side effects of toggling i18n Studio mode, including:
+ * - Adding/removing CSS classes to the document body and root element to reflect the active state of i18n Studio mode.
+ * - Setting up a global keyboard shortcut (Ctrl/Cmd + Shift + F) to toggle i18n Studio mode on and off.
+ * - Providing functions to check and mark HMR attachment status, which can be used by other parts of the plugin to ensure that certain effects or listeners are only set up once.
+ * @param onToggleOff A callback function that is called when i18n Studio mode is toggled off, allowing the caller to perform any necessary cleanup (e.g., closing modals, resetting state) when exiting Studio mode.
+ * @returns An object containing the checkHmrAttached and markHmrAttached functions for managing HMR attachment status.
  */
 export function useStudioEffects(onToggleOff: () => void) {
   const { isStudioMode, toggleMode } = useStudioState();

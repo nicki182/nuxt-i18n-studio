@@ -52,29 +52,22 @@
 </template>
 
 <script setup lang="ts">
-// Define props using TypeScript interface
 const props = defineProps<{
   isOpen: boolean;
   isVerifying?: boolean;
   errorMessage?: string;
 }>();
 
-// Define emits using TypeScript interface to ensure payload is typed
 const emit = defineEmits<{
   (e: "submit", token: string): void;
 }>();
 
-const githubToken = ref<string>("");
-
-// Clear the input and errors when the modal opens/closes
-watch(
-  () => props.isOpen,
-  (newVal) => {
-    if (newVal) {
-      githubToken.value = "";
-    }
+const githubToken = computed({
+  get: () => "",
+  set: (value: string) => {
+    githubToken.value = value.trim();
   },
-);
+});
 
 const handleSubmit = () => {
   if (githubToken.value && !props.isVerifying) {

@@ -1,16 +1,15 @@
 import type { TemplateLiteral } from "estree";
 
-import {
-  KeyExtractionType,
-  type ExtractedKey,
-  type ScriptVariableMap,
-} from "../../types";
+import type { ExtractedKey, ScriptVariableMap } from "../../types";
+
+import { KeyExtractionType } from "../../constants";
 
 /**
- *
- * @param args
- * @param args.node
- * @param args.valueMap
+ * Resolves a TemplateLiteral node to extract potential i18n keys.
+ * @param args An object containing the TemplateLiteral node and a map of script variables.
+ * @param args.node The TemplateLiteral node to resolve.
+ * @param args.valueMap A map of script variables that can be used to resolve identifiers to their values.
+ * @returns An array of extracted keys, where each key is an object containing the resolved value and associated metadata.
  */
 export function resolveTemplateLiteral(args: {
   node: TemplateLiteral;

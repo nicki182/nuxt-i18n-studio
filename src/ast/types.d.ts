@@ -1,36 +1,20 @@
+import type { ElementNode } from "@vue/compiler-dom";
+import type {
+  Literal,
+  Identifier,
+  CallExpression,
+  ConditionalExpression,
+  LogicalExpression,
+  TemplateLiteral,
+  Node,
+} from "estree";
 import type { Plugin } from "vite";
-// identifier/function name → all possible string values it can return/hold
-// "__PROP__" sentinel means: value comes from a parent prop
+
+import type { KeyExtractionType } from "./constants";
+
+// ── Script analysis ───────────────────────────────────────────────────────────
+
 export type ScriptVariableMap = Map<string, string[]>;
-
-export enum KeyExtractionType {
-  Static = "static",
-  Traced = "traced",
-  Prop = "prop",
-  Dynamic = "dynamic",
-  Prefix = "prefix",
-}
-
-export type ExtractedKey =
-  | { type: KeyExtractionType.Static; key: string; id: `__STATIC__${string}` }
-  | {
-      type: KeyExtractionType.Traced;
-      key: string;
-      allCandidates: string[];
-      id: `__TRACED__${string}`;
-    }
-  | { type: KeyExtractionType.Prop; propName: string; id: `__PROP__${string}` }
-  | {
-      type: KeyExtractionType.Dynamic;
-      expr: string;
-      candidates: string[];
-      id: `__EXPR__${string}`;
-    }
-  | {
-      type: KeyExtractionType.Prefix;
-      prefix: string;
-      id: `__PREFIX__${string}`;
-    };
 
 export interface HarvestedValue {
   value: string;
@@ -40,16 +24,48 @@ export interface HarvestedValue {
 
 export type ReturnHarvestedValue = HarvestedValue[];
 
-export interface ASTPlugin extends Plugin {
-  _valueMapCache: Map<string, ScriptVariableMap>;
-}
-
-export type PayloadEntry = ExtractedKey & { usageType: string };
-
 export type HarvesterMap = {
   [K in Node["type"]]?: (
     node: Extract<Node, { type: K }>,
   ) => ReturnHarvestedValue | undefined;
+};
+
+// ── Template extraction ───────────────────────────────────────────────────────
+
+// Derive literal types from the const object values
+type KET = typeof KeyExtractionType;
+
+export type ExtractedKey =
+  | { type: KET["Static"]; key: string; id: `__STATIC__${string}` }
+  | {
+      type: KET["Traced"];
+      key: string;
+      allCandidates: string[];
+      id: `__TRACED__${string}`;
+    }
+  | { type: KET["Prop"]; propName: string; id: `__PROP__${string}` }
+  | {
+      type: KET["Dynamic"];
+      expr: string;
+      candidates: string[];
+      id: `__EXPR__${string}`;
+    }
+  | { type: KET["Prefix"]; prefix: string; id: `__PREFIX__${string}` };
+
+export type PayloadEntry = ExtractedKey & { usageType: string };
+
+export type ResolvableNode =
+  | Literal
+  | Identifier
+  | CallExpression
+  | ConditionalExpression
+  | LogicalExpression
+  | TemplateLiteral;
+
+export type ResolverArgs<T extends ResolvableNode> = {
+  node: T;
+  rawSource: string;
+  valueMap: ScriptVariableMap;
 };
 
 export type ResolverMap = {
@@ -57,3 +73,8 @@ export type ResolverMap = {
     args: ResolverArgs<Extract<ResolvableNode, { type: K }>>,
   ) => ExtractedKey[];
 };
+export interface ASTPlugin extends Plugin {
+  _valueMapCache: Map<string, ScriptVariableMap>;
+}
+
+export type WrappableElementNode = ElementNode & { __i18nWrapped?: boolean };

@@ -1,18 +1,16 @@
 // resolveIdentifier.ts
 import type { Identifier } from "estree";
 
-import {
-  KeyExtractionType,
-  type ExtractedKey,
-  type ScriptVariableMap,
-} from "../../types";
+import type { ExtractedKey, ScriptVariableMap } from "../../types";
 
+import { KeyExtractionType } from "../../constants";
 /**
- *
- * @param args
- * @param args.node
- * @param args.valueMap
- * @param args.rawSource
+ * Resolves an Identifier node by extracting keys based on the provided script variable map.
+ * @param args An object containing the Identifier node, the raw source code, and a map of script variables.
+ * @param args.node The Identifier node to resolve.
+ * @param args.valueMap A map of script variables that can be used to resolve identifiers to their values.
+ * @param args.rawSource The raw source code of the script, which may be used for context or fallback values.
+ * @returns An array of extracted keys, where each key is an object containing the resolved value and associated metadata.
  */
 export function resolveIdentifier(args: {
   node: Identifier;

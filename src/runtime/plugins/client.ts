@@ -23,8 +23,11 @@ import { useStudioEffects } from "../composables/useStudioEffects";
 import { useStudioToken } from "../composables/useStudioToken";
 import { updateJSON } from "../utils/updateJSON";
 
-// ── Plugin ────────────────────────────────────────────────────────────────────
-
+/**
+ * Nuxt plugin that mounts the i18n Studio UI and provides core functionality for interactive i18n key inspection and editing.
+ * It manages state for pending translation changes, handles the save and publish workflow, and provides an open-modal function for the directive to display translation details.
+ * The plugin also integrates with the i18n instance to update translations in-memory and persist changes via a server API.
+ */
 export default defineNuxtPlugin((nuxtApp) => {
   if (import.meta.server) return;
 
