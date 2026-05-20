@@ -1,7 +1,12 @@
-import type { ASTPlugin, ScriptVariableMap } from "./types";
+import type {
+  ASTPlugin,
+  ScriptVariableMap,
+  TemplateVariableMap,
+} from "./types";
 
 import { parseSfc } from "./parseSfc";
 import { mapScriptState } from "./script/mapScriptState";
+import { mapScriptTranslations } from "./script/mapScriptTranslations";
 
 /**
  * Vite Plugin:
@@ -14,6 +19,7 @@ export function ASTPlugin(): ASTPlugin {
   // Per-file cache: absolute path → valueMap
   // Invalidated on HMR so edits to script variables are picked up immediately
   const valueMapCache = new Map<string, ScriptVariableMap>();
+  const templateMapCache = new Map<string, TemplateVariableMap>();
 
   return {
     name: "vite-plugin-ast-i18n-studio",
@@ -32,6 +38,11 @@ export function ASTPlugin(): ASTPlugin {
           ? mapScriptState(scriptContent)
           : new Map<string, string[]>(),
       );
+      templateMapCache.set(
+        id,
+        scriptContent ? mapScriptTranslations(scriptContent) : new Map(),
+      );
+
       // Don't transform source — just populate the cache.
       // The nodeTransform registered in setup() does the actual injection.
       return null;
@@ -40,11 +51,15 @@ export function ASTPlugin(): ASTPlugin {
     handleHotUpdate({ file }) {
       if (file.endsWith(".vue")) {
         valueMapCache.delete(file);
+        templateMapCache.delete(file);
       }
     },
 
     get _valueMapCache() {
       return valueMapCache;
+    },
+    get _templateMapCache() {
+      return templateMapCache;
     },
   };
 }

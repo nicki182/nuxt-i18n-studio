@@ -1,12 +1,20 @@
 export default defineEventHandler(async (event) => {
   const { token } = await readBody(event);
 
-  if (!token) {
+  if (!token || typeof token !== "string") {
     throw createError({ statusCode: 400, message: "Token is required" });
   }
 
+  // Validate token format before hitting GitHub API
+  // GitHub PATs start with ghp_, fine-grained with github_pat_
+  if (!token.startsWith("ghp_") && !token.startsWith("github_pat_")) {
+    throw createError({
+      statusCode: 400,
+      message: "Invalid token format — must be a GitHub personal access token",
+    });
+  }
+
   try {
-    // Verify the token with GitHub
     const githubUser: { login: string } = await $fetch(
       "https://api.github.com/user",
       {
@@ -18,13 +26,12 @@ export default defineEventHandler(async (event) => {
       },
     );
 
-    // Encrypt and save token to http-only cookie using nuxt-auth-utils
     await setUserSession(event, {
       user: { login: githubUser.login },
-      secure: { githubToken: token }, // Kept in secure payload so it never hits the client
+      secure: { githubToken: token },
     });
 
-    return { success: true };
+    return { success: true, login: githubUser.login };
   } catch {
     throw createError({ statusCode: 401, message: "Invalid GitHub Token" });
   }

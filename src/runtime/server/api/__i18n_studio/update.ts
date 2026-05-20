@@ -8,11 +8,23 @@ import type { Config } from "../../../types/config";
 import { deleteJSONKey } from "../../../utils/deleteJSONkey";
 import { updateJSON } from "../../../utils/updateJSON";
 
+// ── Validation ────────────────────────────────────────────────────────────────
+
 const updateSchema = z.object({
   updates: z.record(z.string(), z.string()),
-  locale: z.string().default("en"),
+  locale: z.string().min(1).max(10).default("en"),
   clearOtherLocales: z.boolean().default(false),
 });
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface FileToUpdate {
+  path: string;
+  githubPath: string;
+  content: Record<string, unknown>;
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
 
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, updateSchema.parse);
@@ -21,190 +33,233 @@ export default defineEventHandler(async (event) => {
   const targetLocale = body.locale;
   const localesDir = path.resolve(
     process.cwd(),
-    config?.localesPath || "i18n/locales",
+    config?.localesPath ?? "i18n/locales",
   );
 
-  // Array to hold files that need to be committed
-  const filesToUpdate: {
-    path: string;
-    githubPath: string;
-    content: Record<string, string>;
-  }[] = [];
+  const filesToUpdate: FileToUpdate[] = [];
 
+  // ── 1. Build target locale update ──────────────────────────────────────────
+  const targetFilePath = path.resolve(localesDir, `${targetLocale}.json`);
+
+  let targetContent: Record<string, unknown>;
   try {
-    // ── 1. TARGET LOCALE UPDATES ──────────────────────────────
-    const targetFilePath = path.resolve(localesDir, `${targetLocale}.json`);
-    const targetContent = JSON.parse(
-      await fs.readFile(targetFilePath, "utf-8"),
+    targetContent = JSON.parse(await fs.readFile(targetFilePath, "utf-8"));
+  } catch {
+    throw createError({
+      statusCode: 404,
+      message: `Locale file not found: ${targetLocale}.json`,
+    });
+  }
+
+  let targetUpdated = { ...targetContent };
+  for (const [key, newValue] of Object.entries(body.updates)) {
+    targetUpdated = updateJSON(
+      targetUpdated,
+      key,
+      newValue,
+      config?.isFlatJson,
+    );
+  }
+
+  filesToUpdate.push({
+    path: targetFilePath,
+    githubPath: path.join(
+      config?.localesPath ?? "i18n/locales",
+      `${targetLocale}.json`,
+    ),
+    content: targetUpdated,
+  });
+
+  // ── 2. Optionally clear keys from other locales ─────────────────────────────
+  if (body.clearOtherLocales) {
+    // Back up before deleting — safety net for accidental clears
+    if (import.meta.dev) {
+      const backupDir = path.resolve(localesDir, ".i18n-studio-backup");
+      await fs.mkdir(backupDir, { recursive: true });
+    }
+
+    const allFiles = await fs.readdir(localesDir);
+    const otherLocales = allFiles.filter(
+      (f) => f.endsWith(".json") && f !== `${targetLocale}.json`,
     );
 
-    let targetUpdated = { ...targetContent };
-    for (const [key, newValue] of Object.entries(body.updates)) {
-      targetUpdated = updateJSON(
-        targetUpdated,
-        key,
-        newValue,
-        config?.isFlatJson,
-      );
-    }
+    for (const filename of otherLocales) {
+      const filePath = path.resolve(localesDir, filename);
 
-    filesToUpdate.push({
-      path: targetFilePath,
-      githubPath: path.join(
-        config?.localesPath || "i18n/locales",
-        `${targetLocale}.json`,
-      ),
-      content: targetUpdated,
-    });
-    // ── 2. DELETE FROM OTHER LOCALES (IF CHECKED) ─────────────
-    if (body.clearOtherLocales) {
-      const allFiles = await fs.readdir(localesDir);
-      const otherLocales = allFiles.filter(
-        (f) => f.endsWith(".json") && f !== `${targetLocale}.json`,
-      );
-
-      for (const filename of otherLocales) {
-        const filePath = path.resolve(localesDir, filename);
-        const fileContent = JSON.parse(await fs.readFile(filePath, "utf-8"));
-
-        let updatedOther = { ...fileContent };
-        for (const [key] of Object.entries(body.updates)) {
-          // Completely delete the key instead of setting to ""
-          updatedOther = deleteJSONKey(updatedOther, key, config?.isFlatJson);
-        }
-
-        filesToUpdate.push({
-          path: filePath,
-          githubPath: path.join(
-            config?.localesPath || "i18n/locales",
-            filename,
-          ),
-          content: updatedOther,
-        });
+      let fileContent: Record<string, unknown>;
+      try {
+        fileContent = JSON.parse(await fs.readFile(filePath, "utf-8"));
+      } catch {
+        // Skip unreadable locale files rather than failing the whole operation
+        continue;
       }
-    }
 
-    // ── 3. LOCAL DEV MODE (WRITE TO DISK) ────────────────────
-    if (import.meta.dev) {
-      for (const file of filesToUpdate) {
-        await fs.writeFile(
-          file.path,
-          JSON.stringify(file.content, null, 2) + "\n",
+      // Back up before modifying
+      if (import.meta.dev) {
+        const backupDir = path.resolve(localesDir, ".i18n-studio-backup");
+        const backupPath = path.resolve(
+          backupDir,
+          `${filename}.${Date.now()}.bak`,
         );
+        await fs.copyFile(filePath, backupPath);
       }
-      if (filesToUpdate.length < 0)
-        return { success: false, message: "No files to update" };
-      return {
-        success: true,
-        json: filesToUpdate[0]?.content ?? {},
-        updates: body.updates,
-      };
+
+      let updatedOther = { ...fileContent };
+      for (const [key] of Object.entries(body.updates)) {
+        updatedOther = deleteJSONKey(updatedOther, key, config?.isFlatJson);
+      }
+
+      filesToUpdate.push({
+        path: filePath,
+        githubPath: path.join(config?.localesPath ?? "i18n/locales", filename),
+        content: updatedOther,
+      });
+    }
+  }
+
+  if (filesToUpdate.length === 0) {
+    throw createError({ statusCode: 400, message: "No files to update" });
+  }
+
+  // ── 3. Dev mode — write directly to disk ───────────────────────────────────
+  if (import.meta.dev) {
+    for (const file of filesToUpdate) {
+      await fs.writeFile(
+        file.path,
+        JSON.stringify(file.content, null, 2) + "\n",
+      );
     }
 
-    // ── 4. PRODUCTION MODE (OCTOKIT GITHUB PR) ───────────────
-    else {
-      const session = await requireUserSession(event);
-      const token = session.secure?.githubToken;
+    return {
+      success: true,
+      json: filesToUpdate[0]?.content ?? {},
+      updates: body.updates,
+    };
+  }
 
-      if (!token)
-        throw createError({ statusCode: 401, message: "GitHub token missing" });
-      if (!config?.githubRepo)
-        throw createError({
-          statusCode: 500,
-          message: "githubRepo not set in config",
-        });
+  // ── 4. Production mode — create GitHub PR via Octokit ─────────────────────
+  const session = await requireUserSession(event);
+  const token = session.secure?.githubToken;
 
-      const [owner = "", repo = ""] = config.githubRepo.split("/");
-      const octokit = new Octokit({ auth: token });
-
-      // A. Get the default branch and its latest commit SHA
-      const { data: repoData } = await octokit.rest.repos.get({
-        owner: owner,
-        repo: repo,
-      });
-      const defaultBranch = repoData.default_branch;
-      const { data: refData } = await octokit.rest.git.getRef({
-        owner: owner,
-        repo: repo,
-        ref: `heads/${defaultBranch}`,
-      });
-      const baseSha = refData.object.sha;
-
-      // B. Create a new Tree containing all updated JSON files
-      const tree = filesToUpdate.map((file) => ({
-        path: file.githubPath,
-        mode: "100644" as const,
-        type: "blob" as const,
-        content: JSON.stringify(file.content, null, 2) + "\n",
-      }));
-
-      const { data: treeData } = await octokit.rest.git.createTree({
-        owner,
-        repo,
-        base_tree: baseSha,
-        tree,
-      });
-
-      // C. Create a Commit
-      const firstKey = Object.keys(body.updates)[0];
-      const commitMsg = `chore(i18n): update translation for ${firstKey} ${Object.keys(body.updates).length > 1 ? "+ more" : ""}`;
-
-      const { data: commitData } = await octokit.rest.git.createCommit({
-        owner,
-        repo,
-        message: commitMsg,
-        tree: treeData.sha,
-        parents: [baseSha],
-      });
-
-      // D. Create a new Branch
-      const branchName = `i18n-studio-update-${Date.now()}`;
-      await octokit.rest.git.createRef({
-        owner,
-        repo,
-        ref: `refs/heads/${branchName}`,
-        sha: commitData.sha,
-      });
-
-      // E. Create the Pull Request
-      const { data: prData } = await octokit.rest.pulls.create({
-        owner,
-        repo,
-        title: commitMsg,
-        head: branchName,
-        base: defaultBranch,
-        body: `Updated translations via Nuxt i18n Studio.\n\nKeys updated:\n${Object.keys(
-          body.updates,
-        )
-          .map((k) => `- \`${k}\``)
-          .join("\n")}`,
-      });
-
-      return {
-        success: true,
-        prUrl: prData.html_url,
-        json: filesToUpdate[0]?.content ?? {},
-        updates: body.updates,
-      };
-    }
-  } catch (error: unknown) {
-    console.error(error);
-
-    // Safely extract message
-    const message = error instanceof Error ? error.message : String(error);
-
-    // Safely extract status code
-    const isErrorObject = typeof error === "object" && error !== null;
-    const statusCode =
-      isErrorObject && "statusCode" in error
-        ? Number(error.statusCode)
-        : isErrorObject && "status" in error
-          ? Number(error.status)
-          : 500;
-
+  if (!token) {
+    throw createError({ statusCode: 401, message: "GitHub token missing" });
+  }
+  if (!config?.githubRepo) {
     throw createError({
-      statusCode,
-      message: `Studio Save Error: ${message}`,
+      statusCode: 500,
+      message: "githubRepo not configured — add it to i18nStudio.githubRepo",
+    });
+  }
+
+  const [owner = "", repo = ""] = config.githubRepo.split("/");
+  if (!owner || !repo) {
+    throw createError({
+      statusCode: 500,
+      message: "githubRepo must be in the format 'owner/repo'",
+    });
+  }
+
+  const octokit = new Octokit({ auth: token });
+
+  try {
+    // A. Get default branch and latest commit SHA
+    const { data: repoData } = await octokit.rest.repos.get({ owner, repo });
+    const defaultBranch = repoData.default_branch;
+
+    const { data: refData } = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${defaultBranch}`,
+    });
+    const baseSha = refData.object.sha;
+
+    // B. Check for existing open i18n Studio PRs to warn about conflicts
+    const { data: openPRs } = await octokit.rest.pulls.list({
+      owner,
+      repo,
+      state: "open",
+    });
+    const conflictingPR = openPRs.find((pr) =>
+      pr.head.ref.startsWith("i18n-studio-update-"),
+    );
+    if (conflictingPR) {
+      return {
+        success: false,
+        conflict: true,
+        existingPrUrl: conflictingPR.html_url,
+        message: `An open i18n Studio PR already exists. Merge or close it before creating a new one.`,
+      };
+    }
+
+    // C. Create tree with all updated files
+    const tree = filesToUpdate.map((file) => ({
+      path: file.githubPath,
+      mode: "100644" as const,
+      type: "blob" as const,
+      content: JSON.stringify(file.content, null, 2) + "\n",
+    }));
+
+    const { data: treeData } = await octokit.rest.git.createTree({
+      owner,
+      repo,
+      base_tree: baseSha,
+      tree,
+    });
+
+    // D. Create commit
+    const firstKey = Object.keys(body.updates)[0] ?? "keys";
+    const extraCount = Object.keys(body.updates).length - 1;
+    const commitMsg = `chore(i18n): update translation for ${firstKey}${
+      extraCount > 0 ? ` + ${extraCount} more` : ""
+    }`;
+
+    const { data: commitData } = await octokit.rest.git.createCommit({
+      owner,
+      repo,
+      message: commitMsg,
+      tree: treeData.sha,
+      parents: [baseSha],
+    });
+
+    // E. Create branch and PR
+    const branchName = `i18n-studio-update-${Date.now()}`;
+    await octokit.rest.git.createRef({
+      owner,
+      repo,
+      ref: `refs/heads/${branchName}`,
+      sha: commitData.sha,
+    });
+
+    const { data: prData } = await octokit.rest.pulls.create({
+      owner,
+      repo,
+      title: commitMsg,
+      head: branchName,
+      base: defaultBranch,
+      body: [
+        "Updated translations via Nuxt i18n Studio.",
+        "",
+        "Keys updated:",
+        ...Object.keys(body.updates).map((k) => `- \`${k}\``),
+      ].join("\n"),
+    });
+
+    return {
+      success: true,
+      prUrl: prData.html_url,
+      json: filesToUpdate[0]?.content ?? {},
+      updates: body.updates,
+    };
+  } catch (error: unknown) {
+    // Re-throw H3 errors (createError) as-is
+    if (typeof error === "object" && error !== null && "statusCode" in error) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    throw createError({
+      statusCode: 500,
+      message: `GitHub operation failed: ${message}`,
     });
   }
 });

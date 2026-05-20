@@ -7,14 +7,12 @@ import type {
   LogicalExpression,
   TemplateLiteral,
   Node,
+  FunctionDeclaration,
+  VariableDeclarator,
 } from "estree";
 import type { Plugin } from "vite";
 
 import type { KeyExtractionType } from "./constants";
-
-// ── Script analysis ───────────────────────────────────────────────────────────
-
-export type ScriptVariableMap = Map<string, string[]>;
 
 export interface HarvestedValue {
   value: string;
@@ -52,7 +50,24 @@ export type ExtractedKey =
     }
   | { type: KET["Prefix"]; prefix: string; id: `__PREFIX__${string}` };
 
+export type ScriptResolver =
+  | { type: KET["Static"]; key: string; id: `__STATIC__${string}` }
+  | { type: KET["Prefix"]; prefix: string; id: `__PREFIX__${string}` }
+  | { type: KET["Dynamic"]; expr: string; id: `__EXPR__${string}` }
+  | {
+      type: KET["Traced"];
+      key: string;
+      allCandidates: string[];
+      id: `__TRACED__${string}`;
+    }
+  | { type: KET["Direct"]; key: string; id: `__STATIC__${string}` };
+
 export type PayloadEntry = ExtractedKey & { usageType: string };
+
+export type ScriptVariableMap = Map<string, string[]>;
+export type TemplateVariableMap = Map<string, ScriptResolver[]>;
+
+export type ScriptResolvableNode = VariableDeclarator | FunctionDeclaration;
 
 export type ResolvableNode =
   | Literal
@@ -68,13 +83,25 @@ export type ResolverArgs<T extends ResolvableNode> = {
   valueMap: ScriptVariableMap;
 };
 
+export type ScriptResolverArgs<T extends ScriptResolvableNode> = {
+  node: T;
+  source: string;
+};
+
 export type ResolverMap = {
   [K in ResolvableNode["type"]]?: (
     args: ResolverArgs<Extract<ResolvableNode, { type: K }>>,
   ) => ExtractedKey[];
 };
+
+export type ResolverMapScript = {
+  [K in ScriptResolvableNode["type"]]?: (
+    args: ScriptResolverArgs<Extract<ScriptResolvableNode, { type: K }>>,
+  ) => ScriptResolver[];
+};
 export interface ASTPlugin extends Plugin {
   _valueMapCache: Map<string, ScriptVariableMap>;
+  _templateMapCache: Map<string, TemplateVariableMap>;
 }
 
 export type WrappableElementNode = ElementNode & { __i18nWrapped?: boolean };
