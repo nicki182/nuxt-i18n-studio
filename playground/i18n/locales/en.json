@@ -10,7 +10,7 @@
     },
     "text": {
       "ariaLabel": "This is an aria label 2",
-      "label": "This is a text 1"
+      "label": "This is a text 2"
     },
     "dynamic": {
       "first": "First dynamic valu",
@@ -19,6 +19,13 @@
     "role": {
       "admin": "Admin User",
       "user": "Standard User 1"
+    },
+    "script": {
+      "label": "This is a text 1"
+    },
+    "greeting": {
+      "morning": "Good morning 1",
+      "evening": "Good evening 3"
     }
   },
   "toast": {

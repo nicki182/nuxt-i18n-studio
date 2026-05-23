@@ -6,7 +6,10 @@
       "value": "This is a nested message 3",
       "anotherValue": "Another nested message 2"
     },
-    "text": {}
+    "text": {
+      "ariaLabel": "This is an aria label 2",
+      "label": "This is a text 1"
+    }
   },
   "toast": {}
 }

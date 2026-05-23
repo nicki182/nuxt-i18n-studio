@@ -79,8 +79,7 @@ export function hasTemplateVariableRef(
     if (childNode.type !== NodeTypes.INTERPOLATION) continue;
     const interp = childNode as InterpolationNode;
     const expression = interp.content?.loc?.source ?? "";
-    const match = expression.match(BARE_IDENTIFIER_RE);
-    if (match?.[1] && templateVariableMap.has(match[1])) return true;
+    if (expression && templateVariableMap.has(expression.trim())) return true;
   }
 
   for (const propNode of el.props) {
@@ -88,8 +87,7 @@ export function hasTemplateVariableRef(
     const prop = propNode as DirectiveNode;
     if (prop.name !== "bind" || !prop.exp) continue;
     const expression = prop.exp.loc?.source ?? "";
-    const match = expression.match(BARE_IDENTIFIER_RE);
-    if (match?.[1] && templateVariableMap.has(match[1])) return true;
+    if (expression && templateVariableMap.has(expression.trim())) return true;
   }
 
   return false;
@@ -102,7 +100,6 @@ export function hasTemplateVariableRef(
 export function isTCall(node: Node): boolean {
   if (node.type !== "CallExpression") return false;
   const call = node as CallExpression;
-
   // t('key') or $t('key')
   if (call.callee.type === "Identifier") {
     const name = (call.callee as Identifier).name;

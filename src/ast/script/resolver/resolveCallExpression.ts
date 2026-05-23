@@ -1,51 +1,74 @@
-import type { CallExpression } from "estree";
+import type {
+  CallExpression,
+  ConditionalExpression,
+  LogicalExpression,
+  Literal,
+  TemplateLiteral,
+} from "estree";
 
 import type { ScriptResolver } from "../../types";
 
-/**
- *
- * @param node
- * @param source
- */
+import { resolveLiteral } from "./resolveLiteral";
+import { resolveTemplateLiteral } from "./resolveTemplateLiteral";
+
 export function resolveCallExpression(
   node: CallExpression,
   source: string,
-): ScriptResolver | null {
+): ScriptResolver[] {
   const firstArg = node.arguments[0];
-  if (!firstArg) return null;
+  if (!firstArg) return [];
 
-  // t('home.title') — direct string literal
   if (
     firstArg.type === "Literal" &&
-    typeof (firstArg as { value: unknown }).value === "string"
+    typeof (firstArg as Literal).value === "string"
   ) {
-    const key = (firstArg as { value: string }).value;
-    return { type: "direct", key, id: `__STATIC__${key}` };
+    return resolveLiteral({ node: firstArg as Literal });
   }
 
-  // t(`home.${type}`) — template literal with static prefix
   if (firstArg.type === "TemplateLiteral") {
-    const tmpl = firstArg as {
-      expressions: unknown[];
-      quasis: { value: { cooked: string } }[];
-    };
-
-    if (tmpl.expressions.length === 0) {
-      // Fully static template literal
-      const key = tmpl.quasis.map((q) => q.value.cooked).join("");
-      return { type: "direct", key, id: `__STATIC__${key}` };
-    }
-
-    const prefix = tmpl.quasis[0]?.value?.cooked ?? "";
-    if (prefix) {
-      return { type: "prefix", prefix, id: `__PREFIX__${prefix}` };
-    }
+    return resolveTemplateLiteral({
+      node: firstArg as TemplateLiteral,
+      source,
+    });
   }
 
-  // t(someVar) or t(getKey()) — dynamic, extract raw source
-  const argStart = (firstArg as unknown as { start: number }).start;
-  const argEnd = (firstArg as unknown as { end: number }).end;
+  if (firstArg.type === "ConditionalExpression") {
+    const cond = firstArg as ConditionalExpression;
+    const tempNodeA = {
+      ...node,
+      arguments: [cond.consequent],
+    } as CallExpression;
+    const tempNodeB = {
+      ...node,
+      arguments: [cond.alternate],
+    } as CallExpression;
+
+    return [
+      ...resolveCallExpression(tempNodeA, source),
+      ...resolveCallExpression(tempNodeB, source),
+    ];
+  }
+
+  if (firstArg.type === "LogicalExpression") {
+    const log = firstArg as LogicalExpression;
+    const tempNodeA = {
+      ...node,
+      arguments: [log.left],
+    } as CallExpression;
+    const tempNodeB = {
+      ...node,
+      arguments: [log.right],
+    } as CallExpression;
+
+    return [
+      ...resolveCallExpression(tempNodeA, source),
+      ...resolveCallExpression(tempNodeB, source),
+    ];
+  }
+
+  const argStart = (firstArg as any).start;
+  const argEnd = (firstArg as any).end;
   const expr = source.slice(argStart, argEnd);
 
-  return { type: "dynamic", expr, id: `__EXPR__${expr}` };
+  return [{ type: "dynamic", expr, id: `__EXPR__${expr}` }];
 }

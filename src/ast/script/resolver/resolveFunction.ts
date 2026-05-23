@@ -36,7 +36,7 @@ export function resolveFunction({
   if (body.type !== "BlockStatement") {
     if (isTCall(body)) {
       const call = resolveCallExpression(body as CallExpression, source);
-      if (call) calls.push(call);
+      if (call) calls.push(...call);
     }
     return calls;
   }
@@ -53,7 +53,7 @@ export function resolveFunction({
             ret.argument as CallExpression,
             source,
           );
-          if (call) calls.push(call);
+          if (call) calls.push(...call);
         }
         return;
       }
@@ -63,7 +63,7 @@ export function resolveFunction({
         const expr = (node as { expression: Expression }).expression;
         if (isTCall(expr)) {
           const call = resolveCallExpression(expr as CallExpression, source);
-          if (call) calls.push(call);
+          if (call) calls.push(...call);
         }
       }
     },

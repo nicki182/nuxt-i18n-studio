@@ -28,11 +28,10 @@ export function resolveExpression({
   if (!node) return [];
 
   const calls: ScriptResolver[] = [];
-
   // Direct t() call: const title = t('home.title')
   if (isTCall(node)) {
-    const call = resolveCallExpression(node as CallExpression, source);
-    if (call) calls.push(call);
+    const callArray = resolveCallExpression(node as CallExpression, source);
+    calls.push(...callArray);
     return calls;
   }
 
@@ -47,16 +46,9 @@ export function resolveExpression({
     // Vue composables that wrap a callback: computed, watchEffect, etc.
     if (["computed", "watchEffect"].includes(calleeName)) {
       const firstArg = callExpr.arguments[0];
-      if (
-        firstArg?.type === "ArrowFunctionExpression" ||
-        firstArg?.type === "FunctionExpression"
-      ) {
-        calls.push(
-          ...resolveFunction({
-            node: firstArg as ArrowFunctionExpression | FunctionExpression,
-            source,
-          }),
-        );
+      if (firstArg) {
+        // Guaranteed fix: pass it recursively so the ArrowFunction block below catches it!
+        calls.push(...resolveExpression({ node: firstArg as Expression, source }));
       }
       return calls;
     }

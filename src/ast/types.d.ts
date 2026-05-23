@@ -9,6 +9,8 @@ import type {
   Node,
   FunctionDeclaration,
   VariableDeclarator,
+  AssignmentExpression,
+  Expression
 } from "estree";
 import type { Plugin } from "vite";
 
@@ -67,7 +69,7 @@ export type PayloadEntry = ExtractedKey & { usageType: string };
 export type ScriptVariableMap = Map<string, string[]>;
 export type TemplateVariableMap = Map<string, ScriptResolver[]>;
 
-export type ScriptResolvableNode = VariableDeclarator | FunctionDeclaration;
+export type ScriptResolvableNode = VariableDeclarator | FunctionDeclaration | AssignmentExpression | Expression;
 
 export type ResolvableNode =
   | Literal
@@ -75,7 +77,8 @@ export type ResolvableNode =
   | CallExpression
   | ConditionalExpression
   | LogicalExpression
-  | TemplateLiteral;
+  | TemplateLiteral
+  | Expression;
 
 export type ResolverArgs<T extends ResolvableNode> = {
   node: T;
