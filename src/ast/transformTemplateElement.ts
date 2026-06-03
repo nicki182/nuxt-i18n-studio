@@ -50,12 +50,7 @@ export function transformTemplateElement(
     const hasDeclaredKeys = source.includes(DECLARED_KEYS_ATTR);
     const hasTemplateRef = hasTemplateVariableRef(el, templateVariableMap);
 
-    if (
-      !hasTCall &&
-      !hasDeclaredKeys &&
-      !hasTemplateRef
-    )
-      return;
+    if (!hasTCall && !hasDeclaredKeys && !hasTemplateRef) return;
 
     const payloadEntries: PayloadEntry[] = [];
 
@@ -99,13 +94,13 @@ export function transformTemplateElement(
 
         // Phase 2: plain identifier that calls t() in the script
         // e.g. {{ title }} where const title = computed(() => t('home.title'));
-          for (const entry of templateVariableMap.get(expression) ?? []) {
-            payloadEntries.push({
-              ...entry,
-              usageType: "text:script-ref",
-              // Store which script variable this came from for traceability
-              scriptRef: expression,
-            } as PayloadEntry & { scriptRef: string });
+        for (const entry of templateVariableMap.get(expression) ?? []) {
+          payloadEntries.push({
+            ...entry,
+            usageType: "text:script-ref",
+            // Store which script variable this came from for traceability
+            scriptRef: expression,
+          } as PayloadEntry & { scriptRef: string });
         }
       }
 
@@ -135,20 +130,27 @@ export function transformTemplateElement(
           payloadEntries.push({ ...entry, usageType: `attr:${attrName}` });
         }
       }
+
       // Phase 2: :placeholder="label" where label = computed(() => t(...))
-        for (const entry of templateVariableMap.get(expression) ?? []) {
-            payloadEntries.push({
-              ...entry,
-              usageType: "text:script-ref",
-              // Store which script variable this came from for traceability
-              scriptRef: expression,
-            } as PayloadEntry & { scriptRef: string });
+      const bareMatch = expression.match(BARE_IDENTIFIER_RE);
+      if (bareMatch?.[1]) {
+        const identifierName = bareMatch[1];
+        for (const entry of extractScriptTranslations(
+          identifierName,
+          templateVariableMap,
+        )) {
+          payloadEntries.push({
+            ...entry,
+            usageType: `attr:${attrName}`,
+            scriptRef: identifierName,
+          } as PayloadEntry & { scriptRef: string });
         }
+      }
     }
 
     if (payloadEntries.length === 0) return;
     el.__i18nWrapped = true;
-    const directive = injectDirective(payloadEntries);
-    el.props.push(directive);
+    const [directiveNode, idAttrNode] = injectDirective(payloadEntries);
+    el.props.push(directiveNode, idAttrNode);
   };
 }
