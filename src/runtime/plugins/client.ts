@@ -59,7 +59,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       const messages = i18n?.getLocaleMessage?.(currentLocale) || {};
 
       const initials: Record<string, string> = {};
-
+      console.log("Opening modal for translations:", translations, messages);
       translations.forEach((t) => {
         // Layer 1: look up the raw value from the i18n message store
         const resolved = t.key.split(".").reduce((o: unknown, k: string) => {
@@ -80,7 +80,9 @@ export default defineNuxtPlugin((nuxtApp) => {
         ) {
           // Vue-i18n compiled message proxy
           const compiledObj = resolved as { loc?: { source?: string } };
+          console.log("Resolved message is a compiled object, attempting to extract raw JSON value:", compiledObj);
           if (typeof compiledObj.loc?.source === "string") {
+            console.log("Extracted raw JSON value from compiled message:", compiledObj.loc.source);
             rawJsonVal = compiledObj.loc.source;
           }
         }

@@ -5,21 +5,33 @@
       <button class="close-btn" @click="isOpen = false">✕</button>
     </div>
 
+    <div class="panel-search">
+      <input
+        v-model="search"
+        class="search-input"
+        placeholder="Filter keys..."
+        type="text"
+      />
+    </div>
+
     <div class="panel-body">
-      <p v-if="pageKeys.length === 0" class="empty-state">
-        No translations detected on this page.
+      <p v-if="filteredKeys.length === 0" class="empty-state">
+        {{ pageKeys.length === 0 ? "No translations detected on this page." : "No keys match your filter." }}
       </p>
 
       <ul v-else class="key-list">
-        <li v-for="key in pageKeys" :key="key" class="key-item">
+        <li v-for="key in filteredKeys" :key="key" class="key-item">
           <span class="key-name">{{ key }}</span>
           <button class="edit-btn" @click="triggerEdit(key)">Edit</button>
         </li>
       </ul>
     </div>
+
+    <div class="panel-footer">
+      {{ filteredKeys.length }} / {{ pageKeys.length }} keys
+    </div>
   </div>
 
-  <!-- A floating toggle button to open the panel when Studio is active -->
   <button
     v-if="isStudioMode && !isOpen"
     class="i18n-page-translations-toggle"
@@ -34,10 +46,20 @@ import { useStudioState } from "../composables/useStudioState";
 
 const { isStudioMode, pageKeys } = useStudioState();
 
-// Local state to toggle just this panel
 const isOpen = ref(false);
+const search = ref("");
 
-// We inject the same openModal function you use in I18nEditable!
+const filteredKeys = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return pageKeys.value;
+  return pageKeys.value.filter((key) => key.toLowerCase().includes(q));
+});
+
+// Reset search when panel is closed
+watch(isOpen, (val) => {
+  if (!val) search.value = "";
+});
+
 const openModal =
   inject<
     (
@@ -48,8 +70,6 @@ const openModal =
 
 const triggerEdit = (key: string) => {
   if (openModal) {
-    // We format it exactly how your existing modal expects it.
-    // Since it's from the page list, it doesn't have a specific DOM element attached.
     openModal([{ key, usages: ["text"] }]);
   }
 };
@@ -76,7 +96,7 @@ const triggerEdit = (key: string) => {
   bottom: 20px;
   left: 20px;
   width: 320px;
-  max-height: 400px;
+  max-height: 480px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -84,10 +104,7 @@ const triggerEdit = (key: string) => {
   display: flex;
   flex-direction: column;
   z-index: 999999;
-  font-family:
-    system-ui,
-    -apple-system,
-    sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
 }
 
@@ -98,6 +115,7 @@ const triggerEdit = (key: string) => {
   padding: 12px 16px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .panel-header h3 {
@@ -113,6 +131,34 @@ const triggerEdit = (key: string) => {
   font-size: 16px;
   cursor: pointer;
   color: #64748b;
+}
+
+.panel-search {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.search-input:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+}
+
+.search-input::placeholder {
+  color: #94a3b8;
 }
 
 .panel-body {
@@ -162,10 +208,21 @@ const triggerEdit = (key: string) => {
   border-radius: 4px;
   font-size: 12px;
   cursor: pointer;
+  flex-shrink: 0;
   transition: background 0.2s;
 }
 
 .edit-btn:hover {
   background: #2563eb;
+}
+
+.panel-footer {
+  padding: 8px 16px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: right;
+  flex-shrink: 0;
+  background: #f8fafc;
 }
 </style>

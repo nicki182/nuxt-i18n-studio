@@ -13,7 +13,7 @@
       "label": "This is a text 2"
     },
     "dynamic": {
-      "first": "First dynamic valu",
+      "first": "First dynamic value",
       "second": "Second dynamic valu"
     },
     "role": {

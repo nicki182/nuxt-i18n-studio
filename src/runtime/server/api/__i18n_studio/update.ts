@@ -29,8 +29,9 @@ interface FileToUpdate {
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, updateSchema.parse);
   const config = useRuntimeConfig(event).public.i18nStudio as Config;
-
-  const targetLocale = body.locale;
+  const localeAliases = config.localeAliases ?? {};
+  console.log("Received update request:", localeAliases, body.locale);
+  const targetLocale = localeAliases[body.locale]?.default ?? body.locale;
   const localesDir = path.resolve(
     process.cwd(),
     config?.localesPath ?? "i18n/locales",
@@ -42,6 +43,7 @@ export default defineEventHandler(async (event) => {
   const targetFilePath = path.resolve(localesDir, `${targetLocale}.json`);
 
   let targetContent: Record<string, unknown>;
+  console.log("Reading target locale file:", targetFilePath);
   try {
     targetContent = JSON.parse(await fs.readFile(targetFilePath, "utf-8"));
   } catch {
@@ -51,15 +53,15 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  let targetUpdated = { ...targetContent };
+  let targetUpdated = { ...targetContent } as Record<string, unknown>;
   for (const [key, newValue] of Object.entries(body.updates)) {
     targetUpdated = updateJSON(
       targetUpdated,
       key,
-      newValue,
+      newValue as string,
       config?.isFlatJson,
-    );
-  }
+    ) ?? {};
+  };
 
   filesToUpdate.push({
     path: targetFilePath,

@@ -22,6 +22,8 @@ export interface HarvestedValue {
   isProp?: boolean;
 }
 
+export type PropKeyMap = Map<string, Map<string, string[]>>;
+
 export type ReturnHarvestedValue = HarvestedValue[];
 
 export type HarvesterMap = {
@@ -105,6 +107,7 @@ export type ResolverMapScript = {
 export interface ASTPlugin extends Plugin {
   _valueMapCache: Map<string, ScriptVariableMap>;
   _templateMapCache: Map<string, TemplateVariableMap>;
+  _propKeyMap: PropKeyMap;
 }
 
 export type WrappableElementNode = ElementNode & { __i18nWrapped?: boolean };

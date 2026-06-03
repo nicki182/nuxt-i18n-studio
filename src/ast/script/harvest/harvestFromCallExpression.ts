@@ -12,14 +12,14 @@ import type {
 import type { ReturnHarvestedValue } from "../../types";
 
 /**
- * Harvests return values from a CallExpression, specifically targeting defineProps calls.
- * @param node The CallExpression node to harvest from.
- * @returns The harvested return value, or undefined if not applicable.
+ * Harvests prop names from a defineProps() call, supporting three forms:
+ *  - defineProps<{ header: string; tagline: string }>()  — TypeScript generic (most common in <script setup lang="ts">)
+ *  - defineProps({ titleKey: String, ... })               — object runtime declaration
+ *  - defineProps(['titleKey', 'otherKey'])                — array runtime declaration
  */
 export function harvestFromCallExpression(
   node: CallExpression,
 ): ReturnHarvestedValue | undefined {
-  // callee is Expression | Super — narrow to Identifier for name check
   if (
     node.callee.type !== "Identifier" ||
     (node.callee as Identifier).name !== "defineProps"
@@ -27,16 +27,59 @@ export function harvestFromCallExpression(
     return;
 
   const results: ReturnHarvestedValue = [];
+
+  // ── TypeScript generic form: defineProps<{ prop: Type; ... }>() ───────────
+  // acorn-typescript puts the type argument on node.typeArguments (NOT typeParameters)
+  // as a TSTypeParameterInstantiation. Its .params[0] is a TSTypeLiteral whose
+  // .members are TSPropertySignature nodes — one per declared prop.
+  const typeArgs = (
+    node as unknown as {
+      typeArguments?: {
+        type: string;
+        params?: Array<{
+          type: string;
+          members?: Array<{
+            type: string;
+            key?: { type: string; name?: string; value?: unknown };
+          }>;
+        }>;
+      };
+    }
+  ).typeArguments;
+
+  if (typeArgs?.params?.length) {
+    const firstParam = typeArgs.params[0];
+    if (
+      firstParam?.type === "TSTypeLiteral" &&
+      Array.isArray(firstParam.members)
+    ) {
+      for (const member of firstParam.members) {
+        if (member?.type !== "TSPropertySignature" || !member.key) continue;
+        const propName =
+          member.key.type === "Identifier"
+            ? member.key.name
+            : member.key.type === "Literal"
+              ? String(member.key.value)
+              : null;
+        if (propName) {
+          results.push({ name: propName, value: "__PROP__", isProp: true });
+        }
+      }
+    }
+  }
+
+  // If the TS generic form produced results, return early —
+  // it's mutually exclusive with the runtime argument forms.
+  if (results.length) return results;
+
+  // ── Runtime object form: defineProps({ titleKey: String, ... }) ───────────
   const arg = node.arguments[0] as Expression | undefined;
   if (!arg) return results;
 
-  // defineProps({ titleKey: String, ... })
   if (arg.type === "ObjectExpression") {
     (arg as ObjectExpression).properties.forEach(
       (prop: Property | SpreadElement) => {
-        // Skip spread elements — ...rest has no static key
         if (prop.type === "SpreadElement") return;
-
         const key = (prop as Property).key;
         const propName =
           key.type === "Identifier"
@@ -44,7 +87,6 @@ export function harvestFromCallExpression(
             : key.type === "Literal"
               ? String((key as Literal).value)
               : null;
-
         if (propName) {
           results.push({ name: propName, value: "__PROP__", isProp: true });
         }
@@ -52,10 +94,9 @@ export function harvestFromCallExpression(
     );
   }
 
-  // defineProps(['titleKey', 'otherKey'])
+  // ── Runtime array form: defineProps(['titleKey', 'otherKey']) ─────────────
   if (arg.type === "ArrayExpression") {
     (arg as ArrayExpression).elements.forEach((el) => {
-      // elements can be Expression | SpreadElement | null (sparse arrays)
       if (!el || el.type !== "Literal") return;
       const literal = el as Literal;
       if (typeof literal.value === "string") {

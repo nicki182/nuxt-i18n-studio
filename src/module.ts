@@ -41,15 +41,11 @@ export default defineNuxtModule({
       githubRepo: options.githubRepo,
     };
 
-    // ── VITE PLUGIN ────────────────────────────────────────────────────────────
-    // Instantiate once so the valueMapCache is shared between the Vite plugin
-    // and the nodeTransform that reads from it.
+    // ── VITE PLUGIN ───────────────────────────────────────────────────────
     const vitePlugin = ASTPlugin();
     addVitePlugin(vitePlugin);
 
-    // ── NODE TRANSFORM ─────────────────────────────────────────────────────────
-    // Reads per-file valueMap from the Vite plugin cache by context.filename.
-    // Uses unshift so it runs before any other registered nodeTransforms.
+    // ── NODE TRANSFORM ────────────────────────────────────────────────────
     nuxt.options.vue.compilerOptions.nodeTransforms =
       nuxt.options.vue.compilerOptions.nodeTransforms || [];
 
@@ -57,11 +53,14 @@ export default defineNuxtModule({
       createTemplateNodeTransform(vitePlugin),
     );
 
-    // ── REGISTRATIONS ──────────────────────────────────────────────────────────
+    // ── REGISTRATIONS ─────────────────────────────────────────────────────
     nuxt.options.css.push(resolver.resolve("./runtime/assets/style.css"));
 
+    // i18n-click replaces the old directive plugin — one document listener,
+    // reads data-i18n-keys attribute injected by the AST at build time
     addPlugin({
       src: resolver.resolve("./runtime/plugins/directive"),
+      mode: "client",
       order: 1,
     });
 

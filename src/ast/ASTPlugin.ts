@@ -2,29 +2,25 @@ import type {
   ASTPlugin,
   ScriptVariableMap,
   TemplateVariableMap,
+  PropKeyMap,
 } from "./types";
 
 import { parseSfc } from "./parseSfc";
 import { mapScriptState } from "./script/mapScriptState";
 import { mapScriptTranslations } from "./script/mapScriptTranslations";
+// import { scanComponentPropKeys } from "./template";
 
-/**
- * Vite Plugin:
- * Vite's transform() hook receives the full raw .vue source before any
- * compilation — so we can parse the script block, build the valueMap, and
- * cache it keyed by file ID for the nodeTransform to read.
- * @returns An object conforming to the ASTPlugin interface that can be used as a Vite plugin.
- */
 export function ASTPlugin(): ASTPlugin {
-  // Per-file cache: absolute path → valueMap
-  // Invalidated on HMR so edits to script variables are picked up immediately
   const valueMapCache = new Map<string, ScriptVariableMap>();
   const templateMapCache = new Map<string, TemplateVariableMap>();
 
+  // componentName → propName → keys[]
+  // e.g. "HeaderAppPageEvent" → "header" → ["i18n._global.faq"]
+  // Populated as each file is transformed, persists across HMR
+  const propKeyMap: PropKeyMap = new Map();
+
   return {
     name: "vite-plugin-ast-i18n-studio",
-    // Run before @vitejs/plugin-vue so the valueMap is ready when the
-    // template compiler fires the nodeTransform
     enforce: "pre",
 
     transform(source, id) {
@@ -32,19 +28,28 @@ export function ASTPlugin(): ASTPlugin {
 
       const { scriptContent } = parseSfc(source);
 
-      valueMapCache.set(
-        id,
-        scriptContent
-          ? mapScriptState(scriptContent)
-          : new Map<string, string[]>(),
-      );
-      templateMapCache.set(
-        id,
-        scriptContent ? mapScriptTranslations(scriptContent) : new Map(),
-      );
+      const scriptVariableMap = scriptContent
+        ? mapScriptState(scriptContent)
+        : new Map<string, string[]>();
 
-      // Don't transform source — just populate the cache.
-      // The nodeTransform registered in setup() does the actual injection.
+      const templateVariableMap = scriptContent
+        ? mapScriptTranslations(scriptContent)
+        : new Map<string, never>();
+
+      valueMapCache.set(id, scriptVariableMap);
+      templateMapCache.set(id, templateVariableMap);
+
+      // Scan this file's template for component usages that pass $t() keys
+      // or prop passthroughs as props — populate propKeyMap for child components
+      // if (templateContent) {
+      //   scanComponentPropKeys(
+      //     templateContent,
+      //     scriptVariableMap,
+      //     templateVariableMap,
+      //     propKeyMap,
+      //   );
+      // }
+
       return null;
     },
 
@@ -52,14 +57,12 @@ export function ASTPlugin(): ASTPlugin {
       if (file.endsWith(".vue")) {
         valueMapCache.delete(file);
         templateMapCache.delete(file);
+        // Don't clear propKeyMap — it gets overwritten on re-transform
       }
     },
 
-    get _valueMapCache() {
-      return valueMapCache;
-    },
-    get _templateMapCache() {
-      return templateMapCache;
-    },
+    get _valueMapCache() { return valueMapCache; },
+    get _templateMapCache() { return templateMapCache; },
+    get _propKeyMap() { return propKeyMap; },
   };
 }

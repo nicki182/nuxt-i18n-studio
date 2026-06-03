@@ -2,6 +2,7 @@ import type {
   DirectiveNode,
   ElementNode,
   InterpolationNode,
+  AttributeNode,
 } from "@vue/compiler-dom";
 import type {
   Node,
@@ -14,14 +15,6 @@ import { NodeTypes } from "@vue/compiler-dom";
 
 import type { PayloadEntry, TemplateVariableMap } from "./types";
 
-import { BARE_IDENTIFIER_RE } from "./constants";
-
-/**
- * Helper functions for AST processing, including utilities for managing maps and arrays during key extraction and transformation processes.
- * @param map The Map object to which the key-value pair should be added.
- * @param key The key under which the value should be stored in the map.
- * @param value The value to be added to the array corresponding to the key in the map.
- */
 export function addToMap(
   map: Map<string, string[]>,
   key: string,
@@ -33,14 +26,14 @@ export function addToMap(
 }
 
 /**
- *
- * @param entries
+ * Injects the v-i18n-studio directive AND a data-i18n-id attribute on the
+ * same element. The UUID on data-i18n-id lets the fragment-recovery mixin
+ * find the exact DOM element via querySelector even when Vue drops the
+ * directive due to a fragment root — no subtree walking needed.
  */
-export function injectDirective(entries: PayloadEntry[]): DirectiveNode {
-  // Base64 encode so Vue's compiler never chokes on special characters.
-  // CRITICAL: wrap in quotes so Vue emits a string literal into the render
-  // function, not a bare identifier. Without quotes, SSR crashes with
-  // "W3sidHlw..." is not defined" because it looks like a JS variable name.
+export function injectDirective(
+  entries: PayloadEntry[],
+): [DirectiveNode, AttributeNode] {
   const quotedPayload = `'${btoa(JSON.stringify(entries))}'`;
 
   const locStub = {
@@ -49,28 +42,58 @@ export function injectDirective(entries: PayloadEntry[]): DirectiveNode {
     end: { offset: 0, line: 1, column: 1 },
   };
 
-  return {
+  const directiveNode: DirectiveNode = {
     type: NodeTypes.DIRECTIVE,
     name: "i18n-studio",
     modifiers: [],
     exp: {
       type: NodeTypes.SIMPLE_EXPRESSION,
       content: quotedPayload,
-      // Always static — the string never changes, only what the directive
-      // does with it at runtime. Avoids unnecessary Vue re-evaluation.
       isStatic: true,
-      constType: 3, // ConstantTypes.CAN_STRINGIFY
+      constType: 3,
       loc: locStub,
     },
     loc: locStub,
   } as unknown as DirectiveNode;
+
+  // Stable UUID generated at compile time — ties this directive payload to a
+  // specific DOM element regardless of fragment depth at runtime.
+  const uuid = generateUUID();
+
+  const idAttrLocStub = {
+    source: uuid,
+    start: { offset: 0, line: 1, column: 1 },
+    end: { offset: 0, line: 1, column: 1 },
+  };
+
+  const idAttrNode: AttributeNode = {
+    type: NodeTypes.ATTRIBUTE,
+    name: "data-i18n-id",
+    value: {
+      type: NodeTypes.TEXT,
+      content: uuid,
+      loc: idAttrLocStub,
+    },
+    loc: idAttrLocStub,
+  } as unknown as AttributeNode;
+
+  return [directiveNode, idAttrNode];
 }
 
 /**
- *
- * @param el
- * @param templateVariableMap
+ * Simple UUID v4 generator — runs at build time only, no runtime cost.
+ * Uses crypto.randomUUID when available (Node 16+), falls back to Math.random.
  */
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 export function hasTemplateVariableRef(
   el: ElementNode,
   templateVariableMap: TemplateVariableMap,
@@ -93,20 +116,13 @@ export function hasTemplateVariableRef(
   return false;
 }
 
-/**
- *
- * @param node
- */
 export function isTCall(node: Node): boolean {
   if (node.type !== "CallExpression") return false;
   const call = node as CallExpression;
-  // t('key') or $t('key')
   if (call.callee.type === "Identifier") {
     const name = (call.callee as Identifier).name;
     return name === "t" || name === "$t";
   }
-
-  // this.$t('key') or i18n.t('key')
   if (call.callee.type === "MemberExpression") {
     const member = call.callee as MemberExpression;
     if (!member.computed && member.property.type === "Identifier") {
@@ -114,6 +130,5 @@ export function isTCall(node: Node): boolean {
       return propName === "t" || propName === "$t";
     }
   }
-
   return false;
 }

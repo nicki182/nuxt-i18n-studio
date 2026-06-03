@@ -1,0 +1,12 @@
+{
+  "home": {
+    "button": "Click me 5",
+    "inputPlaceholder": "Enter your name ",
+    "nested": {
+      "value": "This is a nested message 3",
+      "anotherValue": "Another nested message 2"
+    },
+    "text": {}
+  },
+  "toast": {}
+}

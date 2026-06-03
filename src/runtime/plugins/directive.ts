@@ -1,11 +1,11 @@
+import type { VNode, ComponentPublicInstance } from "vue";
+
 import { useAST } from "../composables/useAST";
 import { useStudioState } from "../composables/useStudioState";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface ResolvedUsage {
   key: string;
-  type: string; // "text:dynamic" | "attr:placeholder" | "declared" | etc.
+  type: string;
   source: "static" | "traced" | "runtime" | "prop";
 }
 
@@ -19,8 +19,6 @@ type OpenModalFn = (
   el: HTMLElement,
 ) => void;
 
-// ── Directive ─────────────────────────────────────────────────────────────────
-
 export default defineNuxtPlugin((nuxtApp) => {
   const { decodePayload, resolveUsages } = useAST();
 
@@ -29,10 +27,19 @@ export default defineNuxtPlugin((nuxtApp) => {
       return {};
     },
 
-    mounted(el: I18nHTMLElement, binding: { value: string }) {
+    mounted(
+      el: I18nHTMLElement,
+      binding: { value: string; instance: ComponentPublicInstance | null },
+      _vnode: VNode,
+    ) {
       el.setAttribute("data-i18n-studio", "true");
 
       const { getPageKeys } = useStudioState();
+
+      // binding.instance is the component instance that owns this element.
+      // This is how Vue 3 exposes the component instance in directive hooks —
+      // vnode.component is null for native DOM elements.
+      const bindingInstance = binding.instance;
 
       const loadUsages = () => {
         try {
@@ -44,7 +51,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             return;
           }
 
-          const resolved = resolveUsages(payload, getPageKeys);
+          const resolved = resolveUsages(payload, getPageKeys, bindingInstance);
 
           if (!resolved.length) {
             delete el.__i18nUsages;
@@ -68,14 +75,11 @@ export default defineNuxtPlugin((nuxtApp) => {
 
         if (e.type !== "click") return;
 
-        // Re-resolve on every click — runtime $t harvest may have grown
         loadUsages();
 
-        // Collapse to key → usages map, merging duplicate keys
         const map = new Map<string, { usages: Set<string>; source: string }>();
 
         (el.__i18nUsages ?? []).forEach(({ key, type, source }) => {
-          // Skip unresolved prefix wildcards — e.g. "errors.*"
           if (!key || key.endsWith("*")) return;
           if (!map.has(key)) map.set(key, { usages: new Set(), source });
           map.get(key)!.usages.add(type);
@@ -105,16 +109,21 @@ export default defineNuxtPlugin((nuxtApp) => {
       });
     },
 
-    // Re-resolve when component state changes
-    updated(el: I18nHTMLElement, binding: { value: string }) {
+    updated(
+      el: I18nHTMLElement,
+      binding: { value: string; instance: ComponentPublicInstance | null },
+      _vnode: VNode,
+    ) {
       try {
         const { getPageKeys } = useStudioState();
+        const bindingInstance = binding.instance;
+
         const raw = binding.value ?? "";
         const payload = decodePayload(raw);
 
         if (!payload.length) return;
 
-        const resolved = resolveUsages(payload, getPageKeys);
+        const resolved = resolveUsages(payload, getPageKeys, bindingInstance);
         el.__i18nUsages = resolved.length ? (resolved as ResolvedUsage[]) : [];
       } catch {
         // Keep existing usages on error

@@ -17,3 +17,22 @@ export type KeyExtractionType =
 export const DECLARED_KEYS_ATTR = "data-i18n-keys";
 
 export const BARE_IDENTIFIER_RE = /^\s*([i_$][\w$]*)\s*$/;
+
+// Native HTML element attributes that can contain translatable text.
+// Used in transformTemplateElement to decide which :attr="$t(...)" bindings
+// are worth injecting keys for. Component props are handled separately
+// via scanComponentPropKeys and have no name restriction.
+export const TRANSLATABLE_ATTRS = [
+  "label",
+  "placeholder",
+  "title",
+  "aria-label",
+  "aria-description",
+  "aria-placeholder",
+  "alt",
+  "content",
+  "tooltip",
+  "helper-text",
+] as const;
+
+export type TranslatableAttr = (typeof TRANSLATABLE_ATTRS)[number];
