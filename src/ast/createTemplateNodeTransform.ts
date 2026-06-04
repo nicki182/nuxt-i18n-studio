@@ -24,9 +24,12 @@ export function createTemplateNodeTransform(plugin: ASTPlugin): NodeTransform {
     const templateVariableMap: TemplateVariableMap =
       plugin._templateMapCache.get(fileId) ?? new Map();
 
-    transformTemplateElement(scriptVariableMap, templateVariableMap)(
-      node,
-      context,
-    );
+    const propKeyMap = plugin._propKeyMap ?? new Map();
+
+    transformTemplateElement(
+      scriptVariableMap,
+      templateVariableMap,
+      propKeyMap,
+    )(node, context);
   };
 }

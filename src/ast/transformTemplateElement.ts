@@ -12,6 +12,7 @@ import type {
   ScriptVariableMap,
   PayloadEntry,
   TemplateVariableMap,
+  PropKeyMap,
   WrappableElementNode,
 } from "./types";
 
@@ -24,18 +25,10 @@ import { injectDirective, hasTemplateVariableRef } from "./helper";
 import { extractScriptTranslations } from "./script/extractScriptTranslations";
 import { extractTemplateTranslations } from "./template/extractTemplateTranslations";
 
-/**
- * Returns a Vue compiler NodeTransform that injects v-i18n-studio directive
- * payloads into elements containing:
- *  - $t() / t() calls (existing)
- *  - data-i18n-keys declarations (existing)
- *  - Plain variable references that call t() in the script (new)
- * @param scriptVariableMap
- * @param templateVariableMap
- */
 export function transformTemplateElement(
   scriptVariableMap: ScriptVariableMap,
   templateVariableMap: TemplateVariableMap,
+  propKeyMap: PropKeyMap,
 ): NodeTransform {
   return (node) => {
     if (node.type !== NodeTypes.ELEMENT) return;
@@ -43,6 +36,50 @@ export function transformTemplateElement(
 
     if (el.__i18nWrapped) return;
     if (el.tagType === 2 || el.tagType === 3) return;
+
+    const payloadEntries: PayloadEntry[] = [];
+
+    // ── Phase 4: Component usage site injection (propKeyMap) ─────────────────
+    // If this element is a component and we have a pre-resolved prop map for it,
+    // inject keys directly here — in the parent template, which is always
+    // compiled after the child. Handles N-level-deep prop chains.
+    if (el.tagType === 1 && el.tag && propKeyMap.has(el.tag)) {
+      const componentPropMap = propKeyMap.get(el.tag)!;
+
+      for (const propNode of el.props) {
+        if (propNode.type !== NodeTypes.DIRECTIVE) continue;
+        const prop = propNode as DirectiveNode;
+        if (prop.name !== "bind" || !prop.exp) continue;
+
+        const propName =
+          prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION
+            ? (prop.arg as SimpleExpressionNode).content
+            : null;
+
+        if (!propName) continue;
+
+        const resolvedKeys = componentPropMap.get(propName);
+        if (!resolvedKeys?.length) continue;
+
+        for (const key of resolvedKeys) {
+          payloadEntries.push({
+            type: KeyExtractionType.Static,
+            key,
+            id: `__STATIC__${key}`,
+            usageType: `prop:${propName}`,
+          });
+        }
+      }
+
+      if (payloadEntries.length > 0) {
+        el.__i18nWrapped = true;
+        const [directiveNode, idAttrNode] = injectDirective(payloadEntries);
+        el.props.push(directiveNode, idAttrNode);
+        return;
+      }
+    }
+
+    // ── Native element phases ─────────────────────────────────────────────────
 
     const source = el.loc?.source ?? "";
     const hasTCall =
@@ -52,9 +89,7 @@ export function transformTemplateElement(
 
     if (!hasTCall && !hasDeclaredKeys && !hasTemplateRef) return;
 
-    const payloadEntries: PayloadEntry[] = [];
-
-    // ── 1. Explicit developer declarations ───────────────────────────────────
+    // ── Phase 1: Explicit developer declarations ──────────────────────────────
     const declaredAttr = el.props.find(
       (p): p is AttributeNode =>
         p.type === NodeTypes.ATTRIBUTE && p.name === DECLARED_KEYS_ATTR,
@@ -75,7 +110,7 @@ export function transformTemplateElement(
         });
     }
 
-    // ── 2. Interpolations ─────────────────────────────────────────────────────
+    // ── Phase 2: Interpolations ───────────────────────────────────────────────
     for (const childNode of el.children) {
       if (childNode.type === NodeTypes.INTERPOLATION) {
         const interp = childNode as InterpolationNode;
@@ -83,7 +118,6 @@ export function transformTemplateElement(
         if (!expression) continue;
 
         if (hasTCall) {
-          // Standard $t() extraction
           for (const entry of extractTemplateTranslations(
             expression,
             scriptVariableMap,
@@ -92,23 +126,19 @@ export function transformTemplateElement(
           }
         }
 
-        // Phase 2: plain identifier that calls t() in the script
-        // e.g. {{ title }} where const title = computed(() => t('home.title'));
+        // Plain identifier that calls t() in the script
+        // e.g. {{ title }} where const title = computed(() => t('home.title'))
         for (const entry of templateVariableMap.get(expression) ?? []) {
           payloadEntries.push({
             ...entry,
             usageType: "text:script-ref",
-            // Store which script variable this came from for traceability
             scriptRef: expression,
           } as PayloadEntry & { scriptRef: string });
         }
       }
-
-      // Compound expressions like {{ foo + bar }} — skip for now,
-      // too complex to safely extract individual identifier references
     }
 
-    // ── 3. Bound attributes ───────────────────────────────────────────────────
+    // ── Phase 3: Bound attributes ─────────────────────────────────────────────
     for (const propNode of el.props) {
       if (propNode.type !== NodeTypes.DIRECTIVE) continue;
       const prop = propNode as DirectiveNode;
@@ -131,7 +161,8 @@ export function transformTemplateElement(
         }
       }
 
-      // Phase 2: :placeholder="label" where label = computed(() => t(...))
+      // :placeholder="label" where label = computed(() => t(...))
+      // Uses BARE_IDENTIFIER_RE to handle whitespace in expressions
       const bareMatch = expression.match(BARE_IDENTIFIER_RE);
       if (bareMatch?.[1]) {
         const identifierName = bareMatch[1];

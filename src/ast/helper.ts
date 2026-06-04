@@ -16,7 +16,7 @@ import { NodeTypes } from "@vue/compiler-dom";
 import type { PayloadEntry, TemplateVariableMap } from "./types";
 
 export function addToMap(
-  map: Map<string, string[]>,
+  map: Map<string, string[]> = new Map(),
   key: string,
   value: string,
 ) {

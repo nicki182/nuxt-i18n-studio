@@ -1,3 +1,4 @@
+import { defineEventHandler, readValidatedBody, createError } from "h3";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Octokit } from "octokit";
@@ -7,7 +8,6 @@ import type { Config } from "../../../types/config";
 
 import { deleteJSONKey } from "../../../utils/deleteJSONkey";
 import { updateJSON } from "../../../utils/updateJSON";
-
 // ── Validation ────────────────────────────────────────────────────────────────
 
 const updateSchema = z.object({

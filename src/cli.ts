@@ -1,7 +1,31 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import path from "node:path";
+
+import { runAnalyze } from "./cli/analyze";
 
 const args = process.argv.slice(2);
+const command = args[0];
+
+// ── analyze command ───────────────────────────────────────────────────────────
+
+if (command === "analyze") {
+  const rootIndex = args.findIndex((a) => a === "--root" || a === "-r");
+  const outputIndex = args.findIndex((a) => a === "--output" || a === "-o");
+
+  const root =
+    rootIndex > -1 ? (args[rootIndex + 1] ?? process.cwd()) : process.cwd();
+  const output =
+    outputIndex > -1
+      ? (args[outputIndex + 1] ?? ".i18n-studio/prop-map.json")
+      : ".i18n-studio/prop-map.json";
+
+  runAnalyze({ root: path.resolve(root), output });
+  process.exit(0);
+}
+
+// ── dev / build commands (existing behaviour, unchanged) ─────────────────────
+
 const portIndex = args.findIndex((arg) => arg === "--port" || arg === "-p");
 const port = portIndex > -1 ? (args[portIndex + 1] ?? "4000") : "4000";
 
@@ -42,4 +66,5 @@ if (isProd) {
     env: studioEnv,
   });
 }
+
 export {};
