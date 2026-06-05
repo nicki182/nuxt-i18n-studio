@@ -7,7 +7,6 @@ export const useAST = () => {
   const decodePayload = (raw: string): ExtractedKey[] => {
     try {
       if (!raw) return [];
-      console.log(raw)
       const clean = raw.trim().replace(/^['"]|['"]$/g, "");
       const decoded = atob(clean);
       return JSON.parse(decoded) as ExtractedKey[];

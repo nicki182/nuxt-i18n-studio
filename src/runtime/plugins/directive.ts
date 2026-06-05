@@ -1,12 +1,14 @@
 import type { VNode, ComponentPublicInstance } from "vue";
 
+import type { I18nInstance } from "../types/i18n";
+
 import { useAST } from "../composables/useAST";
 import { useStudioState } from "../composables/useStudioState";
 
 interface ResolvedUsage {
   key: string;
   type: string;
-  source: "static" | "traced" | "runtime" | "prop";
+  source: "static" | "traced" | "runtime" | "prop" | "prop-translated";
 }
 
 interface I18nHTMLElement extends HTMLElement {
@@ -22,7 +24,8 @@ type OpenModalFn = (
 export default defineNuxtPlugin((nuxtApp) => {
   const { decodePayload, resolveUsages } = useAST();
 
-  nuxtApp.vueApp.directive("i18n-studio", {
+
+  const directiveDef = {
     getSSRProps() {
       return {};
     },
@@ -67,7 +70,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
       loadUsages();
 
-      const blockAndOpen = (e: Event) => {
+     const blockAndOpen = (e: Event) => {
         if (!document.body.classList.contains("i18n-studio-active")) return;
         e.preventDefault();
         e.stopPropagation();
@@ -84,7 +87,6 @@ export default defineNuxtPlugin((nuxtApp) => {
           if (!map.has(key)) map.set(key, { usages: new Set(), source });
           map.get(key)!.usages.add(type);
         });
-
         const translations = Array.from(map.entries()).map(
           ([key, { usages, source }]) => ({
             key,
@@ -101,6 +103,7 @@ export default defineNuxtPlugin((nuxtApp) => {
           openModal(translations, el);
         }
       };
+
 
       el.__i18nHandler = blockAndOpen;
 
@@ -139,6 +142,55 @@ export default defineNuxtPlugin((nuxtApp) => {
       }
       delete el.__i18nUsages;
       delete el.__i18nHandler;
+    },
+  };
+
+  nuxtApp.vueApp.directive("i18n-studio", directiveDef);
+
+  // ── Fragment recovery mixin ────────────────────────────────────────────────
+  // When the directive is on a fragment component, Vue drops it — but the
+  // data-i18n-id attribute still lands on the exact DOM element because it's
+  // a plain attribute, not a directive. We find it via querySelector and
+  // manually call mounted() to attach the handler.
+  nuxtApp.vueApp.mixin({
+    mounted() {
+      const instance = this.$;
+      const dirs = instance?.vnode?.dirs as
+        | Array<{
+            dir: object;
+            value: string;
+            instance: ComponentPublicInstance | null;
+          }>
+        | undefined;
+      if (!dirs?.length) return;
+
+      const ourBinding = dirs.find((d) => d.dir === directiveDef);
+      if (!ourBinding) return;
+
+      const id = (instance.vnode.props as Record<string, string> | null)?.[
+        "data-i18n-id"
+      ];
+      if (!id) return;
+
+      // UUID in DOM = directive mounted normally, nothing to do
+      if (document.querySelector(`[data-i18n-id="${id}"]`)) return;
+
+      // UUID NOT in DOM = fragment. Only proceed if subTree children is a real array.
+      const children = instance.subTree?.children;
+      if (!Array.isArray(children) || !children.length) return;
+
+      for (const child of children as VNode[]) {
+        const el = (child?.el ??
+          child?.component?.subTree?.el) as Element | null;
+        if (!el || el.nodeType !== Node.ELEMENT_NODE) continue;
+        if (el.hasAttribute("data-i18n-studio")) continue;
+
+        directiveDef.mounted(
+          el as I18nHTMLElement,
+          { value: ourBinding.value, instance: ourBinding.instance },
+          instance.vnode as unknown as VNode,
+        );
+      }
     },
   });
 });
