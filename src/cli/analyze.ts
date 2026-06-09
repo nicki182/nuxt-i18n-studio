@@ -2,16 +2,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type {
-  PropKeyMap,
-  ScriptVariableMap,
-  TemplateVariableMap,
-} from "../ast/types";
+import type { PropKeyMap, ScriptVariableMap, TemplateVariableMap } from "../ast/types";
 
 import { parseSfc } from "../ast/parseSfc";
 import { mapScriptState } from "../ast/script/mapScriptState";
 import { mapScriptTranslations } from "../ast/script/mapScriptTranslations";
-import { scanComponentPropKeys } from "../ast/template/scanComponentPropKeys";
+import { buildPropKeyMap } from "../ast/template/scanComponentPropKeys";
+import type { ElementCacheEntry } from "../ast/template/scanComponentPropKeys";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,17 +49,56 @@ function collectVueFiles(dir: string): string[] {
   return results;
 }
 
-// ── Per-file cache entry ──────────────────────────────────────────────────────
+function collectEntryPoints(root: string): string[] {
+  const entryDirs = [
+    path.join(root, "pages"),
+    path.join(root, "layouts"),
+    path.join(root, "app", "pages"),
+    path.join(root, "app", "layouts"),
+  ];
 
-interface FileCache {
-  componentName: string;
-  scriptVariableMap: ScriptVariableMap;
-  templateVariableMap: TemplateVariableMap;
-  templateContent: string | null;
+  const results: string[] = [];
+  for (const dir of entryDirs) {
+    if (fs.existsSync(dir)) {
+      results.push(...collectVueFiles(dir));
+    }
+  }
+
+  return results;
 }
 
-function buildFileCache(files: string[]): FileCache[] {
-  const cache: FileCache[] = [];
+// ── Id generation ─────────────────────────────────────────────────────────────
+
+function toSlug(componentName: string): string {
+  const initials = componentName.match(/[A-Z]/g)?.join("").toLowerCase();
+  return initials ?? componentName.toLowerCase().slice(0, 4);
+}
+
+function generateCandidateId(
+  componentName: string,
+  propName: string,
+  index: number,
+): string {
+  const slug = toSlug(componentName);
+  const safeProp = propName.replace(/[^a-zA-Z0-9]/g, "_");
+  return `${slug}__${safeProp}__${index}`;
+}
+
+function assignCandidateIds(propKeyMap: PropKeyMap): void {
+  for (const [componentName, propMap] of propKeyMap) {
+    for (const [propName, entry] of propMap) {
+      entry.candidates = entry.candidates.map((candidate, index) => ({
+        ...candidate,
+        id: generateCandidateId(componentName, propName, index),
+      }));
+    }
+  }
+}
+
+// ── Per-file cache ────────────────────────────────────────────────────────────
+
+function buildFileCache(files: string[], root: string): ElementCacheEntry[] {
+  const cache: ElementCacheEntry[] = [];
 
   for (const file of files) {
     let source: string;
@@ -75,84 +111,66 @@ function buildFileCache(files: string[]): FileCache[] {
     const { scriptContent, templateContent } = parseSfc(source);
     const basename = path.basename(file, ".vue");
     const componentName = toPascalCase(basename);
+    const filePath = path.relative(root, file);
 
-    const scriptVariableMap = scriptContent
+    const scriptVariableMap: ScriptVariableMap = scriptContent
       ? mapScriptState(scriptContent)
       : new Map<string, string[]>();
 
-    const templateVariableMap = scriptContent
+    const templateVariableMap: TemplateVariableMap = scriptContent
       ? mapScriptTranslations(scriptContent)
       : new Map<string, never>();
 
     cache.push({
       componentName,
+      filePath,
       scriptVariableMap,
       templateVariableMap,
       templateContent,
+      scriptContent,
     });
   }
 
   return cache;
 }
 
-// ── Stabilisation loop ────────────────────────────────────────────────────────
+// ── Serialise ─────────────────────────────────────────────────────────────────
 
-function runStabilisationLoop(
-  cache: FileCache[],
-  propKeyMap: PropKeyMap,
-): number {
-  const MAX_PASSES = 10;
-  let passes = 0;
-
-  for (let i = 0; i < MAX_PASSES; i++) {
-    passes++;
-    let changed = false;
-
-    for (const {
-      componentName,
-      scriptVariableMap,
-      templateVariableMap,
-      templateContent,
-    } of cache) {
-      if (!templateContent) continue;
-
-      const didChange = scanComponentPropKeys(
-        templateContent,
-        scriptVariableMap,
-        templateVariableMap,
-        propKeyMap,
-        componentName,
-      );
-
-      if (didChange) changed = true;
+function serialisePropKeyMap(propKeyMap: PropKeyMap): Record<
+  string,
+  Record<
+    string,
+    {
+      element: string;
+      candidates: {
+        id: string;
+        key: string;
+        path: string;
+        componentInitial: string;
+        componentEnd: string;
+        propName: string;
+        element: string;
+      }[];
     }
-
-    if (!changed) break;
-  }
-
-  return passes;
-}
-
-// ── Serialise propKeyMap → plain JSON ─────────────────────────────────────────
-
-function serialisePropKeyMap(
-  propKeyMap: PropKeyMap,
-): Record<string, Record<string, string[]>> {
-  const out: Record<string, Record<string, string[]>> = {};
+  >
+> {
+  const out: Record<string, Record<string, unknown>> = {};
 
   for (const [component, propMap] of propKeyMap) {
     out[component] = {};
-    for (const [propName, keys] of propMap) {
-      if (keys.length > 0) {
-        out[component][propName] = keys;
-      }
+    for (const [propName, entry] of propMap) {
+      if (entry.candidates.length === 0) continue;
+      out[component][propName] = {
+        element: entry.element,
+        candidates: entry.candidates,
+      };
     }
     if (Object.keys(out[component]).length === 0) {
       delete out[component];
     }
   }
 
-  return out;
+  return out as ReturnType<typeof serialisePropKeyMap>;
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -162,34 +180,45 @@ export function runAnalyze(options: { root: string; output: string }): void {
 
   console.log("\n🔍 i18n-Studio: Analyzing component prop chains...\n");
 
-  // 1. Collect all .vue files
-  const files = collectVueFiles(root);
-  console.log(`   Found ${files.length} Vue files`);
+  const allFiles = collectVueFiles(root);
+  console.log(`   Found ${allFiles.length} Vue files`);
 
-  if (files.length === 0) {
+  if (allFiles.length === 0) {
     console.log("   No Vue files found. Nothing to analyze.\n");
     return;
   }
 
-  // 2. Build per-file caches
-  const cache = buildFileCache(files);
+  const entryPoints = collectEntryPoints(root);
+  console.log(`   Entry points: ${entryPoints.length} page(s)/layout(s) found`);
 
-  // 3. Run stabilisation loop
-  const propKeyMap: PropKeyMap = new Map();
-  const passes = runStabilisationLoop(cache, propKeyMap);
+  if (entryPoints.length === 0) {
+    console.log(
+      "   No pages or layouts found. Check --root points to the project root.\n",
+    );
+    return;
+  }
+
+  const fileCache = buildFileCache(allFiles, root);
+  const entryFilePaths = entryPoints.map((f) => path.relative(root, f));
+
+  const propKeyMap = buildPropKeyMap(fileCache, entryFilePaths);
+
+  assignCandidateIds(propKeyMap);
 
   const componentCount = propKeyMap.size;
   const totalProps = [...propKeyMap.values()].reduce(
     (sum, m) => sum + m.size,
     0,
   );
-
-  console.log(`   Stabilised in ${passes} pass${passes === 1 ? "" : "es"}`);
-  console.log(
-    `   Mapped ${totalProps} prop(s) across ${componentCount} component(s)`,
+  const totalCandidates = [...propKeyMap.values()].reduce(
+    (sum, m) =>
+      [...m.values()].reduce((s, e) => s + e.candidates.length, sum),
+    0,
   );
 
-  // 4. Write output
+  console.log(`   Mapped ${totalProps} prop(s) across ${componentCount} component(s)`);
+  console.log(`   Resolved ${totalCandidates} total candidate(s)`);
+
   const outputPath = path.resolve(root, output);
   const outputDir = path.dirname(outputPath);
 

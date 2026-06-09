@@ -16,13 +16,25 @@ import type { Plugin } from "vite";
 
 import type { KeyExtractionType } from "./constants";
 
+export interface PropCandidate {
+  key: string;
+  component: string;
+}
+
+export interface PropMapEntry {
+  element: string; // "h1", "p", "span", "unknown", etc.
+  candidates: PropCandidate[];
+}
 export interface HarvestedValue {
   value: string;
   name: string;
   isProp?: boolean;
 }
 
-export type PropKeyMap = Map<string, Map<string, string[]>>;
+export type PropKeyMap = Map<
+  string,
+  Map<string, { element: string; candidates: { key: string; page: string; component: string }[] }>
+>;
 
 export type ReturnHarvestedValue = HarvestedValue[];
 
