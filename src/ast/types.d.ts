@@ -116,10 +116,16 @@ export type ResolverMapScript = {
     args: ScriptResolverArgs<Extract<ScriptResolvableNode, { type: K }>>,
   ) => ScriptResolver[];
 };
+
+export type ComponentInitialIndex = Map<
+  string,
+  Map<string, { propId: string; element: string; componentEnd: string }[]>
+>;
 export interface ASTPlugin extends Plugin {
   _valueMapCache: Map<string, ScriptVariableMap>;
   _templateMapCache: Map<string, TemplateVariableMap>;
   _propKeyMap: PropKeyMap;
+  _componentInitialIndex: ComponentInitialIndex; // build-time only
 }
 
 export type WrappableElementNode = ElementNode & { __i18nWrapped?: boolean };

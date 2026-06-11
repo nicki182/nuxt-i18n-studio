@@ -6,8 +6,10 @@ import type {
   ScriptVariableMap,
   TemplateVariableMap,
   PropKeyMap,
+  ComponentInitialIndex
 } from "./types";
 
+import { PROP_MAP_FILE, PROP_MAP_ROUTE } from "./constants";
 import { parseSfc } from "./parseSfc";
 import { mapScriptState } from "./script/mapScriptState";
 import { mapScriptTranslations } from "./script/mapScriptTranslations";
@@ -15,45 +17,149 @@ import { mapScriptTranslations } from "./script/mapScriptTranslations";
 export function ASTPlugin(): ASTPlugin {
   const valueMapCache = new Map<string, ScriptVariableMap>();
   const templateMapCache = new Map<string, TemplateVariableMap>();
-
-  // componentName → propName → keys[]
-  // Pre-populated from .i18n-studio/prop-map.json in buildStart,
-  // then kept alive across HMR for incremental updates.
   const propKeyMap: PropKeyMap = new Map();
+
+  // Build-time index: componentInitial → propName → lookup entries
+  const componentInitialIndex: ComponentInitialIndex = new Map();
+
+  // Runtime flat index: id → candidate (served to browser)
+  const propIdIndex = new Map<string, Record<string, unknown>>();
+
+  function loadPropMap(mapPath: string): void {
+    try {
+      const raw = fs.readFileSync(mapPath, "utf-8");
+      const json = JSON.parse(raw) as {
+        byComponentEnd: Record<
+          string,
+          Record<
+            string,
+            {
+              element: string;
+              candidates: {
+                id: string;
+                key: string;
+                path: string;
+                componentInitial: string;
+                componentEnd: string;
+                propName: string;
+                element: string;
+              }[];
+            }
+          >
+        >;
+        byComponentInitial: Record<
+          string,
+          Record<string, { propId: string; element: string; componentEnd: string }[]>
+        >;
+      };
+
+      propKeyMap.clear();
+      componentInitialIndex.clear();
+      propIdIndex.clear();
+
+      // Load byComponentEnd → propKeyMap + propIdIndex
+      for (const [componentName, props] of Object.entries(json.byComponentEnd)) {
+        const propMapEntry = new Map<
+          string,
+          {
+            element: string;
+            candidates: {
+              id: string;
+              key: string;
+              path: string;
+              componentInitial: string;
+              componentEnd: string;
+              propName: string;
+              element: string;
+            }[];
+          }
+        >();
+
+        for (const [propName, entry] of Object.entries(props)) {
+          propMapEntry.set(propName, entry);
+
+          // Build flat id index for browser
+          for (const candidate of entry.candidates) {
+            propIdIndex.set(candidate.id, candidate);
+          }
+        }
+
+        propKeyMap.set(componentName, propMapEntry);
+      }
+
+      // Load byComponentInitial → componentInitialIndex
+      for (const [componentInitial, props] of Object.entries(
+        json.byComponentInitial,
+      )) {
+        const propMap = new Map<
+          string,
+          { propId: string; element: string; componentEnd: string }[]
+        >();
+
+        for (const [propName, entries] of Object.entries(props)) {
+          propMap.set(propName, entries);
+        }
+
+        componentInitialIndex.set(componentInitial, propMap);
+      }
+
+      const totalProps = [...propKeyMap.values()].reduce(
+        (s, m) => s + m.size,
+        0,
+      );
+      console.log(
+        `[i18n-Studio] Loaded prop map: ${propKeyMap.size} components, ${totalProps} props, ${propIdIndex.size} ids`,
+      );
+    } catch {
+      // No prop-map.json yet — silent fallback
+    }
+  }
+
+  function buildFlatIndex(): string {
+    const index: Record<string, unknown> = {};
+    for (const [id, candidate] of propIdIndex) {
+      index[id] = candidate;
+    }
+    return JSON.stringify(index);
+  }
 
   return {
     name: "vite-plugin-ast-i18n-studio",
     enforce: "pre",
 
     buildStart() {
-      // Load the pre-analysed prop map if it exists.
-      // Written by `i18n-studio analyze` — a single JSON read, near-zero cost.
-      const mapPath = path.resolve(process.cwd(), ".i18n-studio/prop-map.json");
+      const mapPath = path.resolve(process.cwd(), PROP_MAP_FILE);
+      loadPropMap(mapPath);
+    },
+
+    // Serve flat id index in dev
+    configureServer(server) {
+      server.middlewares.use(PROP_MAP_ROUTE, (_req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Cache-Control", "no-store");
+        res.end(buildFlatIndex());
+      });
+    },
+
+    // Copy flat id index to public/ for production
+    writeBundle() {
+      const outDir = path.resolve(process.cwd(), "public/__i18n_studio");
       try {
-        const raw = fs.readFileSync(mapPath, "utf-8");
-        const json = JSON.parse(raw) as Record<string, Record<string, string[]>>;
-
-        for (const [component, props] of Object.entries(json)) {
-          const propMapEntry = new Map<string, string[]>();
-          for (const [propName, keys] of Object.entries(props)) {
-            propMapEntry.set(propName, keys);
-          }
-          propKeyMap.set(component, propMapEntry);
+        if (!fs.existsSync(outDir)) {
+          fs.mkdirSync(outDir, { recursive: true });
         }
-
-        const totalProps = [...propKeyMap.values()].reduce((s, m) => s + m.size, 0);
-        console.log(
-          `[i18n-Studio] Loaded prop map: ${propKeyMap.size} components, ${totalProps} props resolved`,
+        fs.writeFileSync(
+          path.join(outDir, "prop-map.json"),
+          buildFlatIndex(),
+          "utf-8",
         );
       } catch {
-        // No prop-map.json yet — silent fallback.
-        // Run `i18n-studio analyze` to enable deep prop-chain resolution.
+        // Skip if public/ not writable
       }
     },
 
     transform(source, id) {
       if (!id.endsWith(".vue")) return null;
-
       const { scriptContent } = parseSfc(source);
 
       const scriptVariableMap = scriptContent
@@ -75,10 +181,14 @@ export function ASTPlugin(): ASTPlugin {
         valueMapCache.delete(file);
         templateMapCache.delete(file);
       }
+      if (file.endsWith("prop-map.json")) {
+        loadPropMap(file);
+      }
     },
 
     get _valueMapCache() { return valueMapCache; },
     get _templateMapCache() { return templateMapCache; },
     get _propKeyMap() { return propKeyMap; },
+    get _componentInitialIndex() { return componentInitialIndex; },
   };
 }

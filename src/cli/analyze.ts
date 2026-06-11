@@ -10,6 +10,35 @@ import { mapScriptTranslations } from "../ast/script/mapScriptTranslations";
 import { buildPropKeyMap } from "../ast/template/scanComponentPropKeys";
 import type { ElementCacheEntry } from "../ast/template/scanComponentPropKeys";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface PropCandidate {
+  id: string;
+  key: string;
+  path: string;
+  componentInitial: string;
+  componentEnd: string;
+  propName: string;
+  element: string;
+}
+
+interface PropEndEntry {
+  element: string;
+  candidates: PropCandidate[];
+}
+
+// byComponentInitial lookup entry — lightweight, no key duplication
+interface InitialIndexEntry {
+  propId: string;
+  element: string;
+  componentEnd: string;
+}
+
+interface PropMapJson {
+  byComponentEnd: Record<string, Record<string, PropEndEntry>>;
+  byComponentInitial: Record<string, Record<string, InitialIndexEntry[]>>;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toPascalCase(filename: string): string {
@@ -136,41 +165,55 @@ function buildFileCache(files: string[], root: string): ElementCacheEntry[] {
 
 // ── Serialise ─────────────────────────────────────────────────────────────────
 
-function serialisePropKeyMap(propKeyMap: PropKeyMap): Record<
-  string,
-  Record<
-    string,
-    {
-      element: string;
-      candidates: {
-        id: string;
-        key: string;
-        path: string;
-        componentInitial: string;
-        componentEnd: string;
-        propName: string;
-        element: string;
-      }[];
-    }
-  >
-> {
-  const out: Record<string, Record<string, unknown>> = {};
+/**
+ * Builds both indices from propKeyMap:
+ *
+ * byComponentEnd — primary structure, full candidate data
+ *   Used by: Phase 0 (inject data-i18n-prop-ids), runtime (resolveById)
+ *
+ * byComponentInitial — lightweight lookup index, no key duplication
+ *   Used by: Phase 4 (find propId for a given componentInitial + propName + key)
+ */
+function serialisePropKeyMap(propKeyMap: PropKeyMap): PropMapJson {
+  const byComponentEnd: PropMapJson["byComponentEnd"] = {};
+  const byComponentInitial: PropMapJson["byComponentInitial"] = {};
 
-  for (const [component, propMap] of propKeyMap) {
-    out[component] = {};
+  for (const [componentEnd, propMap] of propKeyMap) {
+    byComponentEnd[componentEnd] = {};
+
     for (const [propName, entry] of propMap) {
       if (entry.candidates.length === 0) continue;
-      out[component][propName] = {
+
+      byComponentEnd[componentEnd][propName] = {
         element: entry.element,
         candidates: entry.candidates,
       };
+
+      // Build byComponentInitial index from each candidate
+      for (const candidate of entry.candidates) {
+        const { componentInitial, id, element } = candidate;
+
+        if (!byComponentInitial[componentInitial]) {
+          byComponentInitial[componentInitial] = {};
+        }
+        if (!byComponentInitial[componentInitial][propName]) {
+          byComponentInitial[componentInitial][propName] = [];
+        }
+
+        byComponentInitial[componentInitial][propName].push({
+          propId: id,
+          element,
+          componentEnd,
+        });
+      }
     }
-    if (Object.keys(out[component]).length === 0) {
-      delete out[component];
+
+    if (Object.keys(byComponentEnd[componentEnd]).length === 0) {
+      delete byComponentEnd[componentEnd];
     }
   }
 
-  return out as ReturnType<typeof serialisePropKeyMap>;
+  return { byComponentEnd, byComponentInitial };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -202,7 +245,6 @@ export function runAnalyze(options: { root: string; output: string }): void {
   const entryFilePaths = entryPoints.map((f) => path.relative(root, f));
 
   const propKeyMap = buildPropKeyMap(fileCache, entryFilePaths);
-
   assignCandidateIds(propKeyMap);
 
   const componentCount = propKeyMap.size;

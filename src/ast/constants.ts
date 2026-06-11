@@ -36,3 +36,6 @@ export const TRANSLATABLE_ATTRS = [
 ] as const;
 
 export type TranslatableAttr = (typeof TRANSLATABLE_ATTRS)[number];
+
+export const PROP_MAP_ROUTE = "/__i18n_studio/prop-map.json";
+export const PROP_MAP_FILE = ".i18n-studio/prop-map.json";

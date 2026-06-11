@@ -15,7 +15,9 @@ export function parseSfc(source: string): {
   scriptContent: string | null;
 } {
   try {
-    const { descriptor } = parse(source);
+    const { descriptor } = parse(source,{
+      
+    });
 
     return {
       scriptContent:

@@ -59,6 +59,12 @@ export default defineNuxtModule({
     // i18n-click replaces the old directive plugin — one document listener,
     // reads data-i18n-keys attribute injected by the AST at build time
     addPlugin({
+      src: resolver.resolve("./runtime/plugins/propMap"),
+      mode: "client",
+      order: 0, // load before directive plugin so resolveById is available
+    });
+
+    addPlugin({
       src: resolver.resolve("./runtime/plugins/directive"),
       mode: "client",
       order: 1,

@@ -21,9 +21,56 @@ type OpenModalFn = (
   el: HTMLElement,
 ) => void;
 
+// ── Vnode tree walker ─────────────────────────────────────────────────────────
+// Walks the vnode subtree of a component instance to find a DOM element
+// whose data-i18n-prop-ids attribute contains the given propId.
+// Scoped to this instance's subtree — avoids cross-instance matches.
+
+interface VNodeLike {
+  el?: Element | null;
+  children?: unknown;
+  component?: { subTree?: VNodeLike } | null;
+  shapeFlag?: number;
+}
+
+function findElByPropId(
+  vnode: unknown,
+  propId: string,
+  element: string,
+): Element | null {
+  if (!vnode || typeof vnode !== "object") return null;
+  const v = vnode as VNodeLike;
+
+  // Check this vnode's DOM element
+  if (v.el && v.el.nodeType === Node.ELEMENT_NODE) {
+    const ids = v.el.getAttribute("data-i18n-prop-ids");
+    const tag = v.el.tagName?.toLowerCase();
+    // Match both the propId and element tag for precision
+    const baseElement = element.split("[")[0];
+    if (ids && ids.split(";").includes(propId) && tag === baseElement) {
+      return v.el;
+    }
+  }
+
+  // Recurse into component subTree
+  if (v.component?.subTree) {
+    const found = findElByPropId(v.component.subTree, propId, element);
+    if (found) return found;
+  }
+
+  // Recurse into children array
+  if (Array.isArray(v.children)) {
+    for (const child of v.children) {
+      const found = findElByPropId(child, propId, element);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
 export default defineNuxtPlugin((nuxtApp) => {
   const { decodePayload, resolveUsages } = useAST();
-
 
   const directiveDef = {
     getSSRProps() {
@@ -38,10 +85,6 @@ export default defineNuxtPlugin((nuxtApp) => {
       el.setAttribute("data-i18n-studio", "true");
 
       const { getPageKeys } = useStudioState();
-
-      // binding.instance is the component instance that owns this element.
-      // This is how Vue 3 exposes the component instance in directive hooks —
-      // vnode.component is null for native DOM elements.
       const bindingInstance = binding.instance;
 
       const loadUsages = () => {
@@ -70,7 +113,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
       loadUsages();
 
-     const blockAndOpen = (e: Event) => {
+      const blockAndOpen = (e: Event) => {
         if (!document.body.classList.contains("i18n-studio-active")) return;
         e.preventDefault();
         e.stopPropagation();
@@ -87,6 +130,7 @@ export default defineNuxtPlugin((nuxtApp) => {
           if (!map.has(key)) map.set(key, { usages: new Set(), source });
           map.get(key)!.usages.add(type);
         });
+
         const translations = Array.from(map.entries()).map(
           ([key, { usages, source }]) => ({
             key,
@@ -103,7 +147,6 @@ export default defineNuxtPlugin((nuxtApp) => {
           openModal(translations, el);
         }
       };
-
 
       el.__i18nHandler = blockAndOpen;
 
@@ -148,10 +191,6 @@ export default defineNuxtPlugin((nuxtApp) => {
   nuxtApp.vueApp.directive("i18n-studio", directiveDef);
 
   // ── Fragment recovery mixin ────────────────────────────────────────────────
-  // When the directive is on a fragment component, Vue drops it — but the
-  // data-i18n-id attribute still lands on the exact DOM element because it's
-  // a plain attribute, not a directive. We find it via querySelector and
-  // manually call mounted() to attach the handler.
   nuxtApp.vueApp.mixin({
     mounted() {
       const instance = this.$;
@@ -175,7 +214,49 @@ export default defineNuxtPlugin((nuxtApp) => {
       // UUID in DOM = directive mounted normally, nothing to do
       if (document.querySelector(`[data-i18n-id="${id}"]`)) return;
 
-      // UUID NOT in DOM = fragment. Only proceed if subTree children is a real array.
+      // Fragment recovery — decode payload to extract propId + element
+      const payload = (() => {
+        try {
+          return decodePayload(ourBinding.value);
+        } catch {
+          return [];
+        }
+      })();
+
+      // Extract propId + element from Traced entries
+      type TracedWithPropId = {
+        type: string;
+        propId?: string;
+        element?: string;
+      };
+
+      const tracedEntries = payload
+        .filter((e) => e.type === "traced")
+        .map((e) => e as unknown as TracedWithPropId)
+        .filter((e) => Boolean(e.propId && e.element));
+
+      if (tracedEntries.length > 0) {
+        // Walk the vnode subtree to find the exact element by propId + tag
+        for (const entry of tracedEntries) {
+          const targetEl = findElByPropId(
+            instance.subTree,
+            entry.propId!,
+            entry.element!,
+          );
+
+          if (targetEl && !targetEl.hasAttribute("data-i18n-studio")) {
+            directiveDef.mounted(
+              targetEl as I18nHTMLElement,
+              { value: ourBinding.value, instance: ourBinding.instance },
+              instance.vnode as unknown as VNode,
+            );
+            break;
+          }
+        }
+        return;
+      }
+
+      // Fallback: no propId — use original first-child recovery
       const children = instance.subTree?.children;
       if (!Array.isArray(children) || !children.length) return;
 

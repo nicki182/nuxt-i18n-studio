@@ -3,6 +3,8 @@ import type { ComponentPublicInstance } from "vue";
 import type { ExtractedKey } from "../types/ast";
 import type { ResolvedUsage } from "../types/i18nHTMLElement";
 
+import { usePropKeyMap } from "./usePropKeyMap";
+
 export const useAST = () => {
   const decodePayload = (raw: string): ExtractedKey[] => {
     try {
@@ -32,18 +34,44 @@ export const useAST = () => {
     return [{ key: entry.key, usageType, source: "static" }];
   };
 
-  const resolveTraced: EntryResolver<Extract<ExtractedKey, { type: "traced" }>> = ({ entry, usageType }) => {
-    return entry.allCandidates.map((k) => ({
-      key: k,
+  const resolveTraced: EntryResolver<Extract<ExtractedKey, { type: "traced" }>> = ({
+    entry,
+    usageType,
+  }) => {
+    // Prop chain entry — has a single candidate id for precise O(1) resolution
+    const tracedEntry = entry as typeof entry & { propId?: string };
+
+    if (tracedEntry.propId) {
+      const { resolveById } = usePropKeyMap();
+      const candidate = resolveById(tracedEntry.propId);
+
+      if (candidate) {
+        return [{ key: candidate.key, usageType, source: "static" as const }];
+      }
+      // propId present but not found in index — prop-map.json not generated yet
+      return [];
+    }
+
+    // Non-prop traced entry — original allCandidates behaviour
+    return (entry.allCandidates as { key: string }[]).map((c) => ({
+      key: c.key,
       usageType,
       source: "traced" as const,
     }));
   };
 
-  const resolvePrefix: EntryResolver<Extract<ExtractedKey, { type: "prefix" }>> = ({ entry, usageType, getPageKeys }) => {
+  const resolvePrefix: EntryResolver<Extract<ExtractedKey, { type: "prefix" }>> = ({
+    entry,
+    usageType,
+    getPageKeys,
+  }) => {
     const runtimeMatches = getPageKeys().filter((k) => k.startsWith(entry.prefix));
     if (runtimeMatches.length) {
-      return runtimeMatches.map((k) => ({ key: k, usageType, source: "runtime" as const }));
+      return runtimeMatches.map((k) => ({
+        key: k,
+        usageType,
+        source: "runtime" as const,
+      }));
     }
     return [{ key: `${entry.prefix}*`, usageType, source: "runtime" as const }];
   };
@@ -59,26 +87,31 @@ export const useAST = () => {
     const propValue = bindingInstance.$props?.[propName];
     if (typeof propValue !== "string" || !propValue) return [];
 
-    // If the value looks like an i18n key (dot-separated, starts with a known
-    // namespace), use it directly — the parent passed the key, not the string.
     if (looksLikeI18nKey(propValue)) {
       return [{ key: propValue, usageType, source: "static" as const }];
     }
 
-    // The parent called $t() before passing the prop — we have a translated
-    // string, not a key. Mark it as "prop-translated" so the directive can
-    // do a value-based lookup against the i18n store.
     return [{ key: propValue, usageType, source: "prop-translated" as const }];
   };
 
-  const resolveDynamic: EntryResolver<Extract<ExtractedKey, { type: "dynamic" }>> = ({ entry, usageType }) => {
+  const resolveDynamic: EntryResolver<Extract<ExtractedKey, { type: "dynamic" }>> = ({
+    entry,
+    usageType,
+  }) => {
     if (entry.candidates?.length) {
-      return entry.candidates.map((k) => ({ key: k, usageType, source: "traced" as const }));
+      return entry.candidates.map((k) => ({
+        key: k,
+        usageType,
+        source: "traced" as const,
+      }));
     }
     return [];
   };
 
-  const entryTypeResolver: Record<string, EntryResolver<Extract<ExtractedKey, { type: ExtractedKey }>>> = {
+  const entryTypeResolver: Record<
+    string,
+    EntryResolver<Extract<ExtractedKey, { type: ExtractedKey }>>
+  > = {
     static: resolveStatic as EntryResolver<Extract<ExtractedKey, { type: "static" }>>,
     traced: resolveTraced as EntryResolver<Extract<ExtractedKey, { type: "traced" }>>,
     prefix: resolvePrefix as EntryResolver<Extract<ExtractedKey, { type: "prefix" }>>,
@@ -115,11 +148,6 @@ export const useAST = () => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Heuristic to distinguish an i18n key ("i18n.pages.home.title")
- * from an already-translated string ("Welcome to Activist").
- * Keys are dot-separated identifiers with no spaces.
- */
 function looksLikeI18nKey(value: string): boolean {
   return /^[\w-]+(\.[\w-]+){1,}$/.test(value);
 }

@@ -1,5 +1,16 @@
 import type { ComponentPublicInstance } from "vue";
 
+// Add to your existing types/ast.ts
+
+export interface PropCandidate {
+  id: string;
+  key: string;
+  path: string;
+  componentInitial: string;
+  componentEnd: string;
+  propName: string;
+  element: string;
+}
 interface ASTElement {
   type: number;
   tagType?: number;
