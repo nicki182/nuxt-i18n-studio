@@ -1,7 +1,5 @@
 import type { VNode, ComponentPublicInstance } from "vue";
 
-import type { I18nInstance } from "../types/i18n";
-
 import { useAST } from "../composables/useAST";
 import { useStudioState } from "../composables/useStudioState";
 
@@ -91,12 +89,15 @@ export default defineNuxtPlugin((nuxtApp) => {
         try {
           const raw = binding.value ?? "";
           const payload = decodePayload(raw);
-
           if (!payload.length) {
             el.__i18nUsages = [];
             return;
           }
-
+          if (payload.some((p) => p.type === "traced" && p.propId && p.element === el.tagName.toLowerCase())){
+            const resolved = resolveUsages([payload.find((p) => p.type === "traced" && p.propId && p.element === el.tagName.toLowerCase())], getPageKeys, bindingInstance);
+            el.__i18nUsages = resolved.length ? (resolved as ResolvedUsage[]) : [];
+            return;
+          }
           const resolved = resolveUsages(payload, getPageKeys, bindingInstance);
 
           if (!resolved.length) {
@@ -104,7 +105,6 @@ export default defineNuxtPlugin((nuxtApp) => {
             el.removeAttribute("data-i18n-studio");
             return;
           }
-
           el.__i18nUsages = resolved as ResolvedUsage[];
         } catch {
           el.__i18nUsages = [];
@@ -124,13 +124,11 @@ export default defineNuxtPlugin((nuxtApp) => {
         loadUsages();
 
         const map = new Map<string, { usages: Set<string>; source: string }>();
-
         (el.__i18nUsages ?? []).forEach(({ key, type, source }) => {
           if (!key || key.endsWith("*")) return;
           if (!map.has(key)) map.set(key, { usages: new Set(), source });
           map.get(key)!.usages.add(type);
         });
-
         const translations = Array.from(map.entries()).map(
           ([key, { usages, source }]) => ({
             key,
@@ -222,7 +220,6 @@ export default defineNuxtPlugin((nuxtApp) => {
           return [];
         }
       })();
-
       // Extract propId + element from Traced entries
       type TracedWithPropId = {
         type: string;
@@ -234,7 +231,6 @@ export default defineNuxtPlugin((nuxtApp) => {
         .filter((e) => e.type === "traced")
         .map((e) => e as unknown as TracedWithPropId)
         .filter((e) => Boolean(e.propId && e.element));
-
       if (tracedEntries.length > 0) {
         // Walk the vnode subtree to find the exact element by propId + tag
         for (const entry of tracedEntries) {
@@ -243,14 +239,13 @@ export default defineNuxtPlugin((nuxtApp) => {
             entry.propId!,
             entry.element!,
           );
-
           if (targetEl && !targetEl.hasAttribute("data-i18n-studio")) {
             directiveDef.mounted(
               targetEl as I18nHTMLElement,
               { value: ourBinding.value, instance: ourBinding.instance },
               instance.vnode as unknown as VNode,
             );
-            break;
+            continue;
           }
         }
         return;

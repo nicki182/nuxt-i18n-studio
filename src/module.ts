@@ -39,6 +39,7 @@ export default defineNuxtModule({
       isFlatJson: options.isFlatJson,
       cleanOnValueChange: options.cleanOnValueChange,
       githubRepo: options.githubRepo,
+      localeAliases: options.localeAliases
     };
 
     // ── VITE PLUGIN ───────────────────────────────────────────────────────

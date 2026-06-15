@@ -112,17 +112,6 @@ export function transformTemplateElement(
             scriptVariableMap,
           );
           if (node.tag === "HeaderAppPage" || node.tag === "HeaderAppPageEvent")
-          console.log(
-            "Phase 4 →",
-            el.tag,
-            propName,
-            "| expression:",
-            expression,
-            "| keys:",
-            expressionKeys,
-            "| lookupEntries:",
-            lookupEntries?.map((e) => e.propId),
-          );
           if (expressionKeys.length === 0) continue;
 
           for (const key of expressionKeys) {
@@ -136,16 +125,6 @@ export function transformTemplateElement(
 
               const candidate = propEntry.candidates.find(
                 (c) => c.id === lookupEntry.propId && c.key === key,
-              );
-              if (node.tag === "HeaderAppPage" || node.tag === "HeaderAppPageEvent")
-              console.log(
-                "Candidate match attempt:",
-                lookupEntry.propId,
-                key,
-                "→",
-                candidate ? "FOUND" : "NOT FOUND",
-                "available keys:",
-                propEntry.candidates.map((c) => c.key).slice(0, 3),
               );
               if (!candidate) continue;
 
