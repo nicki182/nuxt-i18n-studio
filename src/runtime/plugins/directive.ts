@@ -149,7 +149,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       el.__i18nHandler = blockAndOpen;
 
       ["click", "mousedown", "mouseup", "submit"].forEach((event) => {
-        el.addEventListener(event, blockAndOpen, { capture: true });
+        el.addEventListener(event, blockAndOpen);
       });
     },
 
@@ -178,7 +178,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       const handler = el.__i18nHandler;
       if (handler) {
         ["click", "mousedown", "mouseup", "submit"].forEach((event) => {
-          el.removeEventListener(event, handler, { capture: true });
+          el.removeEventListener(event, handler);
         });
       }
       delete el.__i18nUsages;

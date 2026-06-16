@@ -16,11 +16,6 @@ import type { Plugin } from "vite";
 
 import type { KeyExtractionType } from "./constants";
 
-export interface PropCandidate {
-  key: string;
-  component: string;
-}
-
 export interface PropMapEntry {
   element: string; // "h1", "p", "span", "unknown", etc.
   candidates: PropCandidate[];
@@ -129,3 +124,38 @@ export interface ASTPlugin extends Plugin {
 }
 
 export type WrappableElementNode = ElementNode & { __i18nWrapped?: boolean };
+
+export interface ElementCacheEntry {
+  componentName: string;
+  filePath: string;
+  templateContent: string | null;
+  scriptContent: string | null;
+  scriptVariableMap: ScriptVariableMap;
+  templateVariableMap: TemplateVariableMap;
+}
+
+export interface PropCandidate {
+  key: string;
+  path: string;           // file where $t() was called
+  componentInitial: string; // first component the prop was passed to
+  componentEnd: string;     // component that owns the native element
+  propName: string;
+  element: string;
+}
+
+interface PropEndEntry {
+  element: string;
+  candidates: PropCandidate[];
+}
+
+// byComponentInitial lookup entry — lightweight, no key duplication
+interface InitialIndexEntry {
+  propId: string;
+  element: string;
+  componentEnd: string;
+}
+
+interface PropMapJson {
+  byComponentEnd: Record<string, Record<string, PropEndEntry>>;
+  byComponentInitial: Record<string, Record<string, InitialIndexEntry[]>>;
+}

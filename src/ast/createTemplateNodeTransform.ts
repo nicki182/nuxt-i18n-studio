@@ -1,7 +1,10 @@
-import path from "node:path";
 import type { NodeTransform } from "@vue/compiler-dom";
+
+import path from "node:path";
+
 import type { ASTPlugin, ScriptVariableMap, TemplateVariableMap } from "./types";
-import { transformTemplateElement } from "./transformTemplateElement";
+
+import { createI18nTransformer } from './transformer';
 
 function toPascalCase(filename: string): string {
   return filename
@@ -25,7 +28,7 @@ export function createTemplateNodeTransform(plugin: ASTPlugin): NodeTransform {
     const basename = path.basename(fileId, ".vue");
     const currentComponentName = toPascalCase(basename);
 
-    transformTemplateElement(
+    createI18nTransformer(
       scriptVariableMap,
       templateVariableMap,
       propKeyMap,

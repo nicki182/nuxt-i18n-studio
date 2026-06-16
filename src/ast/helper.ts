@@ -13,7 +13,9 @@ import type {
 
 import { NodeTypes } from "@vue/compiler-dom";
 
-import type { PayloadEntry, TemplateVariableMap } from "./types";
+import type { PayloadEntry, ScriptVariableMap, TemplateVariableMap, WrappableElementNode } from "./types";
+
+import { extractTemplateTranslations } from "./template";
 
 export function addToMap(
   map: Map<string, string[]> = new Map(),
@@ -131,4 +133,29 @@ export function isTCall(node: Node): boolean {
     }
   }
   return false;
+}
+
+export function extractKeysFromExpression(
+  expression: string,
+  scriptVariableMap: ScriptVariableMap,
+): string[] {
+  const keys: string[] = [];
+  for (const entry of extractTemplateTranslations(
+    expression,
+    scriptVariableMap,
+  )) {
+    if ("key" in entry && entry.key) keys.push(entry.key);
+    if ("allCandidates" in entry) {
+      (entry.allCandidates as { key: string }[]).forEach((c) => {
+        if (c.key) keys.push(c.key);
+      });
+    }
+  }
+  return [...new Set(keys)];
+}
+
+export function injectI18nDirective(el: WrappableElementNode, payload: PayloadEntry[]) {
+  el.__i18nWrapped = true;
+  const [directiveNode, idAttrNode] = injectDirective(payload);
+  el.props.push(directiveNode, idAttrNode);
 }
