@@ -1,3 +1,4 @@
+import { defineEventHandler, getHeader } from "h3";
 // ── i18n-studio server middleware ─────────────────────────────────────────────
 // Applies to all /api/__i18n_studio/* routes.
 // Handles:
@@ -8,7 +9,6 @@
 // ── Rate limit store ──────────────────────────────────────────────────────────
 // Simple in-memory map — sufficient for a dev/staging tool.
 // Keyed by IP, value is attempt count. Cleared after 60s window.
-
 const updateAttempts = new Map<string, number>();
 
 const RATE_LIMIT = 20; // max requests per window
@@ -25,7 +25,7 @@ export default defineEventHandler((event) => {
 
   // Only apply to studio routes
   if (!path.startsWith("/api/__i18n_studio")) return;
-
+  console.log(`[i18n-studio-middleware] ${event.req.method} ${path}`);
   // ── 1. Studio mode guard ────────────────────────────────────────────────────
   // Ensures the studio can never be reached unless explicitly activated
   // via the CLI (which sets I18N_STUDIO_MODE=true)
