@@ -173,3 +173,18 @@ export interface AnalyzeResult {
     totalCandidates: number;
   };
 }
+
+export interface ScanContext {
+  propKeyMap: PropKeyMap;
+  byFilePath: Map<string, ElementCacheEntry>;
+  byComponentName: Map<string, ElementCacheEntry>;
+  visited: Set<string>;
+}
+
+export interface TracePayload {
+  key: string;
+  sourcePath: string;
+  componentInitial: string;
+  componentName: string;
+  propName: string;
+}

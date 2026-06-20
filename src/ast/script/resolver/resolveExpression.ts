@@ -35,10 +35,11 @@ export function resolveExpression({
   if (node.type === "MemberExpression") {
     const member = node as MemberExpression;
     if (
-      !member.computed &&
-      member.object.type === "Identifier" &&
-      (member.object as Identifier).name === "props" ||
-      (member.object.type === "Identifier" && (member.object as Identifier).name === "$props")
+      (!member.computed &&
+        member.object.type === "Identifier" &&
+        (member.object as Identifier).name === "props") ||
+      (member.object.type === "Identifier" &&
+        (member.object as Identifier).name === "$props")
     ) {
       if (member.property.type === "Identifier") {
         const propName = (member.property as Identifier).name;
@@ -64,7 +65,9 @@ export function resolveExpression({
     if (["computed", "watchEffect"].includes(calleeName)) {
       const firstArg = callExpr.arguments[0];
       if (firstArg) {
-        calls.push(...resolveExpression({ node: firstArg as Expression, source }));
+        calls.push(
+          ...resolveExpression({ node: firstArg as Expression, source }),
+        );
       }
       return calls;
     }

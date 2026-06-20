@@ -3,6 +3,8 @@ import type {
   ElementNode,
   InterpolationNode,
   AttributeNode,
+  SimpleExpressionNode,
+  TemplateChildNode,
 } from "@vue/compiler-dom";
 import type {
   Node,
@@ -13,7 +15,14 @@ import type {
 
 import { NodeTypes } from "@vue/compiler-dom";
 
-import type { PayloadEntry, ScriptVariableMap, TemplateVariableMap, WrappableElementNode } from "./types";
+import type {
+  PayloadEntry,
+  ScriptVariableMap,
+  TemplateVariableMap,
+  WrappableElementNode,
+  PropKeyMap,
+  PropCandidate,
+} from "./types";
 
 import { extractTemplateTranslations } from "./template";
 
@@ -154,7 +163,10 @@ export function extractKeysFromExpression(
   return [...new Set(keys)];
 }
 
-export function injectI18nDirective(el: WrappableElementNode, payload: PayloadEntry[]) {
+export function injectI18nDirective(
+  el: WrappableElementNode,
+  payload: PayloadEntry[],
+) {
   el.__i18nWrapped = true;
   const [directiveNode, idAttrNode] = injectDirective(payload);
   el.props.push(directiveNode, idAttrNode);
@@ -171,8 +183,102 @@ export function toSlug(componentName: string): string {
   return initials ?? componentName.toLowerCase().slice(0, 4);
 }
 
-export function generateCandidateId(componentName: string, propName: string, index: number): string {
+export function generateCandidateId(
+  componentName: string,
+  propName: string,
+  index: number,
+): string {
   const slug = toSlug(componentName);
   const safeProp = propName.replace(/[^a-zA-Z0-9]/g, "_");
   return `${slug}__${safeProp}__${index}`;
+}
+
+export function recordCandidate(
+  propKeyMap: PropKeyMap,
+  componentName: string,
+  propName: string,
+  candidate: PropCandidate,
+): void {
+  if (!propKeyMap.has(componentName)) {
+    propKeyMap.set(componentName, new Map());
+  }
+
+  const propMap = propKeyMap.get(componentName)!;
+
+  if (!propMap.has(propName)) {
+    propMap.set(propName, {
+      element: candidate.element,
+      candidates: [],
+    });
+  }
+
+  const entry = propMap.get(propName)!;
+
+  const alreadyExists = entry.candidates.some(
+    (c) => c.key === candidate.key && c.path === candidate.path,
+  );
+
+  if (!alreadyExists) {
+    entry.candidates.push(candidate);
+  }
+}
+
+export function extractKeys(
+  expression: string,
+  scriptVariableMap: ScriptVariableMap,
+): string[] {
+  const keys: string[] = [];
+
+  for (const entry of extractTemplateTranslations(
+    expression,
+    scriptVariableMap,
+  )) {
+    if ("key" in entry && entry.key) {
+      keys.push(entry.key);
+    }
+    if ("allCandidates" in entry) {
+      (entry.allCandidates as { key: string }[]).forEach((c) => {
+        if (c.key) keys.push(c.key);
+      });
+    }
+  }
+
+  return [...new Set(keys)];
+}
+
+export function isElementNode(node: unknown): node is ElementNode {
+  return (
+    !!node &&
+    typeof node === "object" &&
+    (node as any).type === NodeTypes.ELEMENT
+  );
+}
+
+export function isDirectiveNode(
+  node: unknown,
+): node is DirectiveNode & {
+  arg?: SimpleExpressionNode;
+  exp?: SimpleExpressionNode;
+} {
+  return (
+    !!node &&
+    typeof node === "object" &&
+    (node as any).type === NodeTypes.DIRECTIVE
+  );
+}
+
+export function isInterpolationNode(node: unknown): node is InterpolationNode {
+  return (
+    !!node &&
+    typeof node === "object" &&
+    (node as any).type === NodeTypes.INTERPOLATION
+  );
+}
+
+export function hasChildren(
+  node: unknown,
+): node is { children: TemplateChildNode[] } {
+  return (
+    !!node && typeof node === "object" && Array.isArray((node as any).children)
+  );
 }

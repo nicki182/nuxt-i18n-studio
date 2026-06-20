@@ -6,7 +6,7 @@ import type {
   ScriptVariableMap,
   TemplateVariableMap,
   PropKeyMap,
-  ComponentInitialIndex
+  ComponentInitialIndex,
 } from "./types";
 
 import { PROP_MAP_FILE, PROP_MAP_ROUTE } from "./constants";
@@ -49,7 +49,10 @@ export function ASTPlugin(): ASTPlugin {
         >;
         byComponentInitial: Record<
           string,
-          Record<string, { propId: string; element: string; componentEnd: string }[]>
+          Record<
+            string,
+            { propId: string; element: string; componentEnd: string }[]
+          >
         >;
       };
 
@@ -58,7 +61,9 @@ export function ASTPlugin(): ASTPlugin {
       propIdIndex.clear();
 
       // Load byComponentEnd → propKeyMap + propIdIndex
-      for (const [componentName, props] of Object.entries(json.byComponentEnd)) {
+      for (const [componentName, props] of Object.entries(
+        json.byComponentEnd,
+      )) {
         const propMapEntry = new Map<
           string,
           {
@@ -186,9 +191,17 @@ export function ASTPlugin(): ASTPlugin {
       }
     },
 
-    get _valueMapCache() { return valueMapCache; },
-    get _templateMapCache() { return templateMapCache; },
-    get _propKeyMap() { return propKeyMap; },
-    get _componentInitialIndex() { return componentInitialIndex; },
+    get _valueMapCache() {
+      return valueMapCache;
+    },
+    get _templateMapCache() {
+      return templateMapCache;
+    },
+    get _propKeyMap() {
+      return propKeyMap;
+    },
+    get _componentInitialIndex() {
+      return componentInitialIndex;
+    },
   };
 }

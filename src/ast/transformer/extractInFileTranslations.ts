@@ -2,14 +2,14 @@ import {
   NodeTypes,
   type InterpolationNode,
   type DirectiveNode,
-  type SimpleExpressionNode
+  type SimpleExpressionNode,
 } from "@vue/compiler-dom";
 
 import type {
   WrappableElementNode,
   PayloadEntry,
   ScriptVariableMap,
-  TemplateVariableMap
+  TemplateVariableMap,
 } from "../types";
 
 import { DECLARED_KEYS_ATTR, BARE_IDENTIFIER_RE } from "../constants";
@@ -40,7 +40,10 @@ export function extractInFileTranslations(
       if (!expression) continue;
 
       if (hasTCall) {
-        for (const entry of extractTemplateTranslations(expression, scriptVariableMap)) {
+        for (const entry of extractTemplateTranslations(
+          expression,
+          scriptVariableMap,
+        )) {
           entries.push({ ...entry, usageType: "text:dynamic" });
         }
       }
@@ -70,7 +73,10 @@ export function extractInFileTranslations(
     if (!expression) continue;
 
     if (hasTCall) {
-      for (const entry of extractTemplateTranslations(expression, scriptVariableMap)) {
+      for (const entry of extractTemplateTranslations(
+        expression,
+        scriptVariableMap,
+      )) {
         entries.push({ ...entry, usageType: `attr:${attrName}` });
       }
     }
@@ -78,7 +84,10 @@ export function extractInFileTranslations(
     const bareMatch = expression.match(BARE_IDENTIFIER_RE);
     if (bareMatch?.[1]) {
       const identifierName = bareMatch[1];
-      for (const entry of extractScriptTranslations(identifierName, templateVariableMap)) {
+      for (const entry of extractScriptTranslations(
+        identifierName,
+        templateVariableMap,
+      )) {
         entries.push({
           ...entry,
           usageType: `attr:${attrName}`,

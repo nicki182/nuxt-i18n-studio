@@ -14,6 +14,5 @@ export function resolveVariableDeclarator(
 
   const resolved = resolveExpression({ node: node.init, source });
 
-
   return resolved;
 }

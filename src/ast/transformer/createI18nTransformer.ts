@@ -6,7 +6,7 @@ import type {
   PropKeyMap,
   ComponentInitialIndex,
   WrappableElementNode,
-  PayloadEntry
+  PayloadEntry,
 } from "../types";
 
 import { injectI18nDirective } from "../helper";
@@ -37,7 +37,7 @@ export function createI18nTransformer(
         componentInitialIndex,
         propKeyMap,
         scriptVariableMap,
-        currentComponentName
+        currentComponentName,
       );
 
       // Early intercept for component usage sites
@@ -53,7 +53,11 @@ export function createI18nTransformer(
     payloadEntries = payloadEntries.concat(explicitEntries);
 
     // Layer 4: Native Text/Attr Extractions (Pure Extraction)
-    const dynamicEntries = extractInFileTranslations(el, scriptVariableMap, templateVariableMap);
+    const dynamicEntries = extractInFileTranslations(
+      el,
+      scriptVariableMap,
+      templateVariableMap,
+    );
     payloadEntries = payloadEntries.concat(dynamicEntries);
 
     // Final Directive compilation hook

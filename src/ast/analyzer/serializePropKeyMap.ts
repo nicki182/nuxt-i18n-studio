@@ -1,6 +1,6 @@
 import type { PropKeyMap, PropMapJson } from "../types";
 
-export function serialisePropKeyMap(propKeyMap: PropKeyMap): PropMapJson {
+export function serializePropKeyMap(propKeyMap: PropKeyMap): PropMapJson {
   const byComponentEnd: PropMapJson["byComponentEnd"] = {};
   const byComponentInitial: PropMapJson["byComponentInitial"] = {};
 

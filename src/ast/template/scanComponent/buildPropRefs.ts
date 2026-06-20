@@ -2,9 +2,9 @@ import type { VariableDeclarator, Identifier, Node, Program } from "estree";
 
 import { walk } from "zimmerframe";
 
-import type { ScriptVariableMap } from "../types";
+import type { ScriptVariableMap } from "../../types";
 
-import { TSParser } from "../parser";
+import { TSParser } from "../../parser";
 
 export function buildPropRefs(
   propName: string,

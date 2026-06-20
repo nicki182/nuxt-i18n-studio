@@ -1,2 +1,2 @@
 export * from "./extractTemplateTranslations";
-export * from "./scanComponentPropKeys";
+export * from "./scanComponent";

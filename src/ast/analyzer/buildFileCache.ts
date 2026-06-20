@@ -1,4 +1,9 @@
-import type { ElementCacheEntry, ScriptVariableMap, TemplateVariableMap, RawInputFile } from "../types";
+import type {
+  ElementCacheEntry,
+  ScriptVariableMap,
+  TemplateVariableMap,
+  RawInputFile,
+} from "../types";
 
 import { toPascalCase } from "../helper";
 import { parseSfc } from "../parseSfc";
