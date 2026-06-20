@@ -159,3 +159,20 @@ export function injectI18nDirective(el: WrappableElementNode, payload: PayloadEn
   const [directiveNode, idAttrNode] = injectDirective(payload);
   el.props.push(directiveNode, idAttrNode);
 }
+
+export function toPascalCase(filename: string): string {
+  return filename
+    .replace(/[-_](.)/g, (_, c: string) => c.toUpperCase())
+    .replace(/^(.)/, (_, c: string) => c.toUpperCase());
+}
+
+export function toSlug(componentName: string): string {
+  const initials = componentName.match(/[A-Z]/g)?.join("").toLowerCase();
+  return initials ?? componentName.toLowerCase().slice(0, 4);
+}
+
+export function generateCandidateId(componentName: string, propName: string, index: number): string {
+  const slug = toSlug(componentName);
+  const safeProp = propName.replace(/[^a-zA-Z0-9]/g, "_");
+  return `${slug}__${safeProp}__${index}`;
+}

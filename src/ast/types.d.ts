@@ -159,3 +159,17 @@ interface PropMapJson {
   byComponentEnd: Record<string, Record<string, PropEndEntry>>;
   byComponentInitial: Record<string, Record<string, InitialIndexEntry[]>>;
 }
+
+export interface RawInputFile {
+  relativePath: string;
+  source: string;
+}
+
+export interface AnalyzeResult {
+  jsonReport: PropMapJson;
+  metrics: {
+    componentCount: number;
+    totalProps: number;
+    totalCandidates: number;
+  };
+}

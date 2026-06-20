@@ -4,30 +4,10 @@ import type { Node, Program, VariableDeclarator, Identifier } from "estree";
 import { NodeTypes, parse } from "@vue/compiler-dom";
 import { walk } from "zimmerframe";
 
-import type { ScriptVariableMap, TemplateVariableMap, PropKeyMap } from "../types";
+import type { ScriptVariableMap, ElementCacheEntry, PropKeyMap, PropCandidate } from "../types";
 
 import { TSParser } from "../parser";
 import { extractTemplateTranslations } from "./extractTemplateTranslations";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface ElementCacheEntry {
-  componentName: string;
-  filePath: string;
-  templateContent: string | null;
-  scriptContent: string | null;
-  scriptVariableMap: ScriptVariableMap;
-  templateVariableMap: TemplateVariableMap;
-}
-
-export interface PropCandidate {
-  key: string;
-  path: string;           // file where $t() was called
-  componentInitial: string; // first component the prop was passed to
-  componentEnd: string;     // component that owns the native element
-  propName: string;
-  element: string;
-}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
