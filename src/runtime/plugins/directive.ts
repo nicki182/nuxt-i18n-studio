@@ -93,9 +93,29 @@ export default defineNuxtPlugin((nuxtApp) => {
             el.__i18nUsages = [];
             return;
           }
-          if (payload.some((p) => p.type === "traced" && p.propId && p.element === el.tagName.toLowerCase())){
-            const resolved = resolveUsages([payload.find((p) => p.type === "traced" && p.propId && p.element === el.tagName.toLowerCase())], getPageKeys, bindingInstance);
-            el.__i18nUsages = resolved.length ? (resolved as ResolvedUsage[]) : [];
+          if (
+            payload.some(
+              (p) =>
+                p.type === "traced" &&
+                p.propId &&
+                p.element === el.tagName.toLowerCase(),
+            )
+          ) {
+            const resolved = resolveUsages(
+              [
+                payload.find(
+                  (p) =>
+                    p.type === "traced" &&
+                    p.propId &&
+                    p.element === el.tagName.toLowerCase(),
+                ),
+              ],
+              getPageKeys,
+              bindingInstance,
+            );
+            el.__i18nUsages = resolved.length
+              ? (resolved as ResolvedUsage[])
+              : [];
             return;
           }
           const resolved = resolveUsages(payload, getPageKeys, bindingInstance);
@@ -137,13 +157,11 @@ export default defineNuxtPlugin((nuxtApp) => {
           }),
         );
 
-        const openModal = nuxtApp.vueApp._context.provides[
-          "i18n-open-modal"
-        ] as OpenModalFn | undefined;
-
-        if (openModal && translations.length > 0) {
-          openModal(translations, el);
-        }
+        window.dispatchEvent(
+          new CustomEvent("i18n-studio:open", {
+            detail: { translations, el },
+          }),
+        );
       };
 
       el.__i18nHandler = blockAndOpen;
