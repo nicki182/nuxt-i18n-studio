@@ -3,6 +3,11 @@ import path from "node:path";
 
 import { collectVueFiles } from "./collectVueFiles";
 
+/**
+ * Collects entry points (Vue files) from the specified root directory.
+ * @param root - The root directory to search for entry points.
+ * @returns An array of file paths to the collected entry points.
+ */
 export function collectEntryPoints(root: string): string[] {
   const entryDirs = [
     path.join(root, "pages"),

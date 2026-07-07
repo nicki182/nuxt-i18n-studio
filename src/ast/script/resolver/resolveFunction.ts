@@ -12,7 +12,7 @@ import { walk } from "zimmerframe";
 
 import type { ScriptResolver } from "../../types";
 
-import { isTCall } from "../../helper";
+import { isTCall } from "../helper";
 import { resolveCallExpression } from "./resolveCallExpression";
 
 /**

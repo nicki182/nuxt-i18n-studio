@@ -1,9 +1,8 @@
-// resolveIdentifier.ts
+import type { ExtractedKey, ScriptVariableMap } from "@ast/types";
 import type { Identifier } from "estree";
 
-import type { ExtractedKey, ScriptVariableMap } from "../../types";
+import { KeyExtractionType } from "@ast/constants";
 
-import { KeyExtractionType } from "../../constants";
 /**
  * Resolves an Identifier node by extracting keys based on the provided script variable map.
  * @param args An object containing the Identifier node, the raw source code, and a map of script variables.

@@ -1,7 +1,21 @@
 {
   "extends": "./.nuxt/tsconfig.json",
   "compilerOptions": {
-    "types": ["vite/client"]
+    "types": [
+      "vite/client"
+    ],
+    "paths": {
+      "@utils": [
+        "./src/utils/index"
+      ],
+      "@ast/*": [
+        "./src/ast/*"
+      ]
+    }
   },
-  "exclude": ["dist", "node_modules", "playground"]
+  "exclude": [
+    "dist",
+    "node_modules",
+    "playground"
+  ]
 }

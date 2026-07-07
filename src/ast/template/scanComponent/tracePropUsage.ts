@@ -1,9 +1,16 @@
-import type { ScanContext, TracePayload } from "../../types";
+import type { ScanContext, TracePayload } from "@ast/types";
 
-import { isElementNode, hasChildren } from "../../helper";
 import { checkNativeLeaf } from "./checkNativeLeaf";
 import { checkPropForwarding } from "./checkPropForwarding";
+import { isElementNode, hasChildren } from "./helper";
 
+/**
+ * Recursively traces the usage of a property within a Vue template AST node and its children.
+ * @param node - The current AST node to trace.
+ * @param propRefs - A set of property references to match against.
+ * @param payload - The trace payload containing information about the component and property.
+ * @param ctx - The scan context containing the property key map and other relevant data.
+ */
 export function tracePropUsage(
   node: unknown,
   propRefs: Set<string>,

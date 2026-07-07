@@ -4,7 +4,6 @@ import { walk } from "zimmerframe";
 
 import type { ScriptVariableMap } from "../types";
 
-import { addToMap } from "../helper";
 import { TSParser } from "../parser";
 import { harvestValuesByNodeType } from "./harvest";
 
@@ -38,7 +37,9 @@ export function mapScriptState(scriptCode: string): ScriptVariableMap {
             map.set(name, ["__PROP__"]);
             return;
           }
-          addToMap(map, name, value);
+          if (!map.has(name)) map.set(name, []);
+          const arr = map.get(name)!;
+          if (!arr.includes(value)) arr.push(value);
         });
       },
     });

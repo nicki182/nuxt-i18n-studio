@@ -1,3 +1,7 @@
+import { parseSfc } from "@ast/parseSfc";
+import { mapScriptState,mapScriptTranslations } from "@ast/script";
+import { toPascalCase } from "@utils";
+
 import type {
   ElementCacheEntry,
   ScriptVariableMap,
@@ -5,11 +9,12 @@ import type {
   RawInputFile,
 } from "../types";
 
-import { toPascalCase } from "../helper";
-import { parseSfc } from "../parseSfc";
-import { mapScriptState } from "../script/mapScriptState";
-import { mapScriptTranslations } from "../script/mapScriptTranslations";
 
+/**
+ * Builds a cache of element entries from raw input files.
+ * @param rawFiles - The raw input files to process.
+ * @returns An array of element cache entries.
+ */
 export function buildFileCache(rawFiles: RawInputFile[]): ElementCacheEntry[] {
   return rawFiles.map(({ relativePath, source }) => {
     const { scriptContent, templateContent } = parseSfc(source);
@@ -18,7 +23,7 @@ export function buildFileCache(rawFiles: RawInputFile[]): ElementCacheEntry[] {
 
     const scriptVariableMap: ScriptVariableMap = scriptContent
       ? mapScriptState(scriptContent)
-      : new Map<string, string[]>();
+      : new Map<string, string[]>()
 
     const templateVariableMap: TemplateVariableMap = scriptContent
       ? mapScriptTranslations(scriptContent)

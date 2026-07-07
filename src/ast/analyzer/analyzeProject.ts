@@ -1,10 +1,17 @@
-import type { RawInputFile, AnalyzeResult } from "../types";
+import type { RawInputFile, AnalyzeResult } from "@ast/types";
 
-import { buildPropKeyMap } from "../transformer";
+import { buildPropKeyMap } from "@ast/transformer";
+
 import { assignCandidateIds } from "./assignCandidateIds";
 import { buildFileCache } from "./buildFileCache";
 import { serializePropKeyMap } from "./serializePropKeyMap";
 
+/**
+ * Analyzes a project by processing raw input files and generating a report.
+ * @param rawFiles - The raw input files to analyze.
+ * @param entryFilePaths - The entry file paths for the analysis.
+ * @returns An object containing the JSON report and metrics.
+ */
 export function analyzeProject(
   rawFiles: RawInputFile[],
   entryFilePaths: string[],

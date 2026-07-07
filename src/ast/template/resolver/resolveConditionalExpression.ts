@@ -1,6 +1,5 @@
+import type { ExtractedKey, ScriptVariableMap } from "@ast/types";
 import type { ConditionalExpression } from "estree";
-
-import type { ExtractedKey, ScriptVariableMap } from "../../types";
 
 import { nodeResolver } from "./nodeResolver";
 

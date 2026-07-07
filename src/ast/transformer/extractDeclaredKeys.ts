@@ -1,17 +1,21 @@
+import type { PayloadEntry, WrappableElementNode } from "@ast/types";
+
+import { KeyExtractionType, DECLARED_KEYS_ATTR } from "@ast/constants";
 import { NodeTypes, type AttributeNode } from "@vue/compiler-dom";
 
-import type { WrappableElementNode } from "../types";
-
-import { KeyExtractionType, DECLARED_KEYS_ATTR } from "../constants";
-
+/**
+ * Extracts declared translation keys from a given ElementNode's attributes.
+ * @param el - The ElementNode to extract declared keys from.
+ * @returns {PayloadEntry[]} representing the extracted declared translation keys.
+ */
 export function extractDeclaredKeys(
   el: WrappableElementNode,
-) {
+): PayloadEntry[] {
   const declaredAttr = el.props.find(
         (p): p is AttributeNode =>
           p.type === NodeTypes.ATTRIBUTE && p.name === DECLARED_KEYS_ATTR,
       );
-      const entries = [];
+      const entries: PayloadEntry[] = [];
       if (declaredAttr?.value?.content) {
         declaredAttr.value.content
           .split(",")

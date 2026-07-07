@@ -13,10 +13,17 @@ import type {
 } from "../types";
 
 import { DECLARED_KEYS_ATTR, BARE_IDENTIFIER_RE } from "../constants";
-import { hasTemplateVariableRef } from "../helper";
 import { extractScriptTranslations } from "../script/extractScriptTranslations";
 import { extractTemplateTranslations } from "../template/extractTemplateTranslations";
+import { hasTemplateVariableRef } from "./helper";
 
+/**
+ * Extracts translation keys from a given ElementNode, including text interpolations and bound attributes.
+ * @param el - The ElementNode to extract translations from.
+ * @param scriptVariableMap - A map of script variable references.
+ * @param templateVariableMap - A map of template variable references.
+ * @returns {PayloadEntry[]}  representing the extracted translation keys.
+ */
 export function extractInFileTranslations(
   el: WrappableElementNode,
   scriptVariableMap: ScriptVariableMap,

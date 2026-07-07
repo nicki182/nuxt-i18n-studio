@@ -1,8 +1,7 @@
+import type { ExtractedKey, ScriptVariableMap } from "@ast/types";
 import type { TemplateLiteral } from "estree";
 
-import type { ExtractedKey, ScriptVariableMap } from "../../types";
-
-import { KeyExtractionType } from "../../constants";
+import { KeyExtractionType } from "@ast/constants";
 
 /**
  * Resolves a TemplateLiteral node to extract potential i18n keys.

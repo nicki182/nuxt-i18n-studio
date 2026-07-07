@@ -1,3 +1,4 @@
+import type { ResolverMap, ScriptVariableMap, ExtractedKey } from "@ast/types";
 import type {
   CallExpression,
   ConditionalExpression,
@@ -8,8 +9,6 @@ import type {
   Expression,
   SpreadElement,
 } from "estree";
-
-import type { ResolverMap, ScriptVariableMap, ExtractedKey } from "../../types";
 
 import { resolveCallExpression } from "./resolveCallExpression";
 import { resolveConditionalExpression } from "./resolveConditionalExpression";

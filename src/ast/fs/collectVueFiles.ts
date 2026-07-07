@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 const EXCLUDED_DIRS = ["node_modules", "dist", ".nuxt", ".output"];
-
+/**
+ * Recursively collects all Vue files from the specified directory, excluding certain directories.
+ * @param dir - The directory to search for Vue files.
+ * @returns An array of file paths to the collected Vue files.
+ */
 export function collectVueFiles(dir: string): string[] {
   const results: string[] = [];
   let entries: fs.Dirent[];

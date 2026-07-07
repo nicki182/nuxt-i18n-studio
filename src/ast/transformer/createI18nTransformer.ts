@@ -1,5 +1,3 @@
-import { NodeTypes, type NodeTransform } from "@vue/compiler-dom";
-
 import type {
   ScriptVariableMap,
   TemplateVariableMap,
@@ -7,13 +5,26 @@ import type {
   ComponentInitialIndex,
   WrappableElementNode,
   PayloadEntry,
-} from "../types";
+} from "@ast/types";
 
-import { injectI18nDirective } from "../helper";
+import { injectI18nDirective } from "@ast/helper";
+import { NodeTypes, type NodeTransform } from "@vue/compiler-dom";
+
 import { extractDeclaredKeys } from "./extractDeclaredKeys";
 import { extractInFileTranslations } from "./extractInFileTranslations";
 import { transformComponentProps } from "./transformComponentProps";
 
+/**
+ * Creates a Vue AST transformer that processes elements for i18n translation keys.
+ * It handles within vue files the script and template sections, extracting translation keys from component props,
+ *  explicit declarations, and native text/attributes.
+ * @param scriptVariableMap - A map of script variable names to their values.
+ * @param templateVariableMap - A map of template variable names to their resolvers.
+ * @param propKeyMap - A map of component names to their associated props and candidates.
+ * @param componentInitialIndex - An index of initial component prop IDs for quick lookup.
+ * @param currentComponentName - The name of the current component being processed.
+ * @returns {NodeTransform} - A Vue AST node transformer function.
+ */
 export function createI18nTransformer(
   scriptVariableMap: ScriptVariableMap,
   templateVariableMap: TemplateVariableMap,

@@ -1,8 +1,7 @@
+import type { ExtractedKey } from "@ast/types";
 import type { Literal } from "estree";
 
-import type { ExtractedKey } from "../../types";
-
-import { KeyExtractionType } from "../../constants";
+import { KeyExtractionType } from "@ast/constants";
 
 /**
  * Resolves a Literal node to extract potential i18n keys. If the literal value is a non-empty string,

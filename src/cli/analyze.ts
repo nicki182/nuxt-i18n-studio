@@ -1,14 +1,18 @@
 #!/usr/bin/env node
+import type { RawInputFile } from "@ast/types";
+
+import { analyzeProject } from "@ast/analyzer";
+import { collectEntryPoints, collectVueFiles } from "@ast/fs";
+import { logger } from "@utils";
 import fs from "node:fs";
 import path from "node:path";
 
-import type { RawInputFile } from "../ast/types";
-
-import { analyzeProject } from "../ast/analyzer/analyzeProject";
-import { collectEntryPoints } from "../ast/fs/collectEntryPoints";
-import { collectVueFiles } from "../ast/fs/collectVueFiles";
-import { logger } from "../utils/logger";
-
+/**
+ * Runs the analysis process for a Nuxt project, generating a prop map report.
+ * @param options - The options for the analysis, including root directory and output path
+ * @param options.root - The root directory of the Nuxt project
+ * @param options.output - The output path for the generated prop map report
+ */
 export function runAnalyze(options: { root: string; output: string }): void {
   const { root, output } = options;
 
@@ -39,20 +43,18 @@ export function runAnalyze(options: { root: string; output: string }): void {
         source,
       });
     } catch {
-      // Gracefully bypass unreadable files
+      logger.warn(`   Failed to read file: ${file}. Skipping...`);
     }
     return acc;
   }, []);
 
   const entryFilePaths = entryPoints.map((f) => path.relative(root, f));
 
-  // Invoke the Pure Execution Layer
   const { jsonReport, metrics } = analyzeProject(rawInputFiles, entryFilePaths);
 
   logger.log(`   Mapped ${metrics.totalProps} prop(s) across ${metrics.componentCount} component(s)`);
   logger.log(`   Resolved ${metrics.totalCandidates} total candidate(s)`);
 
-  // Handle output generation
   const outputPath = path.resolve(root, output);
   const outputDir = path.dirname(outputPath);
 

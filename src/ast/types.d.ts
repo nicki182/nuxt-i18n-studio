@@ -10,7 +10,7 @@ import type {
   FunctionDeclaration,
   VariableDeclarator,
   AssignmentExpression,
-  Expression
+  Expression,
 } from "estree";
 import type { Plugin } from "vite";
 
@@ -25,10 +25,36 @@ export interface HarvestedValue {
   name: string;
   isProp?: boolean;
 }
+export type PropCandidate = {
+  id: string;
+  key: string;
+  path: string;
+  componentInitial: string;
+  componentEnd: string;
+  propName: string;
+  element: string;
+};
+
+export type PropComponentJson = {
+  byComponentEnd: Record<
+    string,
+    Record<
+      string,
+      {
+        element: string;
+        candidates: PropCandidate[];
+      }
+    >
+  >;
+  byComponentInitial: Record<
+    string,
+    Record<string, { propId: string; element: string; componentEnd: string }[]>
+  >;
+};
 
 export type PropKeyMap = Map<
   string,
-  Map<string, { element: string; candidates: { key: string; page: string; component: string }[] }>
+  Map<string, { element: string; candidates: PropCandidate[] }>
 >;
 
 export type ReturnHarvestedValue = HarvestedValue[];
@@ -78,7 +104,11 @@ export type PayloadEntry = ExtractedKey & { usageType: string };
 export type ScriptVariableMap = Map<string, string[]>;
 export type TemplateVariableMap = Map<string, ScriptResolver[]>;
 
-export type ScriptResolvableNode = VariableDeclarator | FunctionDeclaration | AssignmentExpression | Expression;
+export type ScriptResolvableNode =
+  | VariableDeclarator
+  | FunctionDeclaration
+  | AssignmentExpression
+  | Expression;
 
 export type ResolvableNode =
   | Literal
@@ -136,9 +166,9 @@ export interface ElementCacheEntry {
 
 export interface PropCandidate {
   key: string;
-  path: string;           // file where $t() was called
+  path: string; // file where $t() was called
   componentInitial: string; // first component the prop was passed to
-  componentEnd: string;     // component that owns the native element
+  componentEnd: string; // component that owns the native element
   propName: string;
   element: string;
 }

@@ -1,9 +1,15 @@
-import { parse } from "@vue/compiler-dom";
+import type { ElementCacheEntry, PropKeyMap, ScanContext } from "@ast/types";
 
-import type { ElementCacheEntry, PropKeyMap, ScanContext } from "../../types";
+import { parse } from "@vue/compiler-dom";
 
 import { scanTemplateForInitialKeys } from "./scanTemplateForInitialKeys";
 
+/**
+ * Builds a property key map by scanning the provided file cache and entry file paths.
+ * @param fileCache - An array of ElementCacheEntry objects representing the cached files.
+ * @param entryFilePaths - An array of file paths to initiate the scanning process.
+ * @returns {PropKeyMap} - A map containing component names, their associated props, and candidates.
+ */
 export function buildPropKeyMap(
   fileCache: ElementCacheEntry[],
   entryFilePaths: string[],

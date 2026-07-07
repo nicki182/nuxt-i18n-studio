@@ -1,12 +1,14 @@
-import type { ScanContext, TracePayload } from "../../types";
+import type { ScanContext, TracePayload } from "@ast/types";
 
-import {
-  hasChildren,
-  isInterpolationNode,
-  isDirectiveNode,
-  recordCandidate,
-} from "../../helper";
+import { recordCandidate,isDirectiveNode,hasChildren,isInterpolationNode } from "./helper";
 
+/**
+ * Check if a node is a native leaf element and record it as a candidate if it matches the provided prop references.
+ * @param node - The AST node to check.
+ * @param propRefs - A set of property references to match against.
+ * @param payload - The trace payload containing information about the component and property.
+ * @param ctx - The scan context containing the property key map and other relevant data.
+ */
 export function checkNativeLeaf(
   node: any,
   propRefs: Set<string>,

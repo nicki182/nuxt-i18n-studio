@@ -1,11 +1,18 @@
+import type { ScriptVariableMap } from "@ast/types";
 import type { VariableDeclarator, Identifier, Node, Program } from "estree";
 
+import { TSParser } from "@ast/parser";
 import { walk } from "zimmerframe";
 
-import type { ScriptVariableMap } from "../../types";
+import { referencesPropsAccess } from "./helper";
 
-import { TSParser } from "../../parser";
-
+/**
+ * Builds a set of property references by analyzing the provided prop name, script variable map, and script code.
+ * @param propName - The name of the property to build references for.
+ * @param scriptVariableMap - A map of script variables and their associated values.
+ * @param scriptCode - The source code of the script to analyze.
+ * @returns {Set<string>} - A set of property references that include the original prop name and any variables referencing it.
+ */
 export function buildPropRefs(
   propName: string,
   scriptVariableMap: ScriptVariableMap,
@@ -47,34 +54,4 @@ export function buildPropRefs(
   }
 
   return refs;
-}
-
-function referencesPropsAccess(node: unknown, propName: string): boolean {
-  if (!node || typeof node !== "object") return false;
-  const n = node as Record<string, unknown>;
-
-  // props.header or props?.header
-  if (
-    n["type"] === "MemberExpression" &&
-    (n["object"] as Record<string, unknown>)?.["type"] === "Identifier" &&
-    (n["object"] as Record<string, unknown>)?.["name"] === "props" &&
-    (n["property"] as Record<string, unknown>)?.["type"] === "Identifier" &&
-    (n["property"] as Record<string, unknown>)?.["name"] === propName
-  ) {
-    return true;
-  }
-
-  // Recurse into all child nodes
-  for (const key of Object.keys(n)) {
-    const child = n[key];
-    if (Array.isArray(child)) {
-      for (const item of child) {
-        if (referencesPropsAccess(item, propName)) return true;
-      }
-    } else if (referencesPropsAccess(child, propName)) {
-      return true;
-    }
-  }
-
-  return false;
 }

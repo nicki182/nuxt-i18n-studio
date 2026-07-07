@@ -1,14 +1,21 @@
-import type { PropKeyMap, PropMapJson } from "../types";
+import type { PropKeyMap, PropMapJson } from "@ast/types";
 
+/**
+ * Serializes a PropKeyMap into a PropMapJson structure.
+ * @param propKeyMap - The PropKeyMap to serialize.
+ * @returns A PropMapJson representation of the PropKeyMap.
+ */
 export function serializePropKeyMap(propKeyMap: PropKeyMap): PropMapJson {
   const byComponentEnd: PropMapJson["byComponentEnd"] = {};
   const byComponentInitial: PropMapJson["byComponentInitial"] = {};
 
   for (const [componentEnd, propMap] of propKeyMap) {
-    byComponentEnd[componentEnd] = {};
-
     for (const [propName, entry] of propMap) {
       if (entry.candidates.length === 0) continue;
+
+      if (!byComponentEnd[componentEnd]) {
+        byComponentEnd[componentEnd] = {};
+      }
 
       byComponentEnd[componentEnd][propName] = {
         element: entry.element,
@@ -31,10 +38,6 @@ export function serializePropKeyMap(propKeyMap: PropKeyMap): PropMapJson {
           componentEnd,
         });
       }
-    }
-
-    if (Object.keys(byComponentEnd[componentEnd]).length === 0) {
-      delete byComponentEnd[componentEnd];
     }
   }
 

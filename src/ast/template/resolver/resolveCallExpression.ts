@@ -1,3 +1,4 @@
+import type { ScriptVariableMap, ExtractedKey } from "@ast/types";
 import type {
   CallExpression,
   MemberExpression,
@@ -6,9 +7,7 @@ import type {
   Literal,
 } from "estree";
 
-import type { ScriptVariableMap, ExtractedKey } from "../../types";
-
-import { KeyExtractionType } from "../../constants";
+import { KeyExtractionType } from "@ast/constants";
 
 /**
  * Resolves a CallExpression node from a $t() argument to all possible ExtractedKey values.

@@ -1,16 +1,19 @@
-import { parse } from "@vue/compiler-dom";
-
-import type { ElementCacheEntry, ScanContext } from "../../types";
+import type { ElementCacheEntry, ScanContext } from "@ast/types";
 
 import {
-  isElementNode,
-  isDirectiveNode,
-  hasChildren,
-  toPascalCase,
   extractKeys,
-} from "../../helper";
-import { visitPropChain } from "./visitPropChains";
+} from "@ast/helper";
+import { logger, toPascalCase } from "@utils";
+import { parse } from "@vue/compiler-dom";
 
+import { isElementNode,isDirectiveNode,hasChildren } from "./helper";
+import { visitPropChain } from "./visitPropChains";
+/**
+ * Recursively scans a Vue template AST node for initial translation keys.
+ * @param node - The current AST node to scan.
+ * @param fileEntry - The cache entry for the current file being scanned.
+ * @param ctx - The scanning context containing state and mappings.
+ */
 export function scanTemplateForInitialKeys(
   node: unknown,
   fileEntry: ElementCacheEntry,
@@ -39,8 +42,8 @@ export function scanTemplateForInitialKeys(
         visitPropChain(ctx, {
           key,
           sourcePath: fileEntry.filePath,
-          componentInitial: componentName, // <-- Use normalized name
-          componentName: componentName, // <-- Use normalized name
+          componentInitial: componentName,
+          componentName: componentName,
           propName,
         });
       }
@@ -58,7 +61,11 @@ export function scanTemplateForInitialKeys(
             childEntry,
             ctx,
           );
-        } catch {}
+        } catch {
+          logger.warn(
+            `Failed to parse template for component ${componentName} in file ${childEntry.filePath}. Skipping.`,
+          );
+        }
       }
     }
   }

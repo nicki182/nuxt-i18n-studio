@@ -1,3 +1,4 @@
+import type { ExtractedKey, ScriptVariableMap } from "@ast/types";
 import type {
   Program,
   CallExpression,
@@ -5,11 +6,9 @@ import type {
   MemberExpression,
 } from "estree";
 
+import { TSParser } from "@ast/parser";
 import { walk } from "zimmerframe";
 
-import type { ExtractedKey, ScriptVariableMap } from "../types";
-
-import { TSParser } from "../parser";
 import { nodeResolver } from "./resolver";
 
 /**

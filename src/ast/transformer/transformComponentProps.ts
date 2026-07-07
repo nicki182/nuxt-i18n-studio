@@ -1,18 +1,25 @@
-import type { DirectiveNode, AttributeNode, SimpleExpressionNode } from "@vue/compiler-dom";
-
-import { NodeTypes } from "@vue/compiler-dom";
-
 import type {
   WrappableElementNode,
   ComponentInitialIndex,
   PropKeyMap,
   ScriptVariableMap,
   PayloadEntry
-} from "../types";
+} from "@ast/types";
+import type { DirectiveNode, AttributeNode, SimpleExpressionNode } from "@vue/compiler-dom";
 
-import { KeyExtractionType } from "../constants";
-import { extractKeysFromExpression } from "../helper";
+import { KeyExtractionType } from "@ast/constants";
+import { extractKeys } from "@ast/helper";
+import { NodeTypes } from "@vue/compiler-dom";
 
+/**
+ * Transforms component props to extract translation keys.
+ * @param el - The ElementNode representing the component.
+ * @param componentInitialIndex - The initial index of the component.
+ * @param propKeyMap - A map of prop keys.
+ * @param scriptVariableMap - A map of script variable references.
+ * @param currentComponentName - The name of the current component.
+ * @returns {PayloadEntry[]} representing the extracted translation keys from component props.
+ */
 export function transformComponentProps(
   el: WrappableElementNode,
   componentInitialIndex: ComponentInitialIndex,
@@ -75,10 +82,11 @@ export function transformComponentProps(
     const expression = prop.exp.loc?.source?.trim();
     if (!expression) continue;
 
-    const expressionKeys = extractKeysFromExpression(expression, scriptVariableMap);
-    if (expressionKeys.length === 0) continue;
+    const expressionKeys = extractKeys(expression, scriptVariableMap);
+    const keys = [...new Set(expressionKeys)];
+    if (keys.length === 0) continue;
 
-    for (const key of expressionKeys) {
+    for (const key of keys) {
       for (const lookupEntry of lookupEntries) {
         const propEntry = propKeyMap.get(lookupEntry.componentEnd)?.get(propName);
         if (!propEntry) continue;
