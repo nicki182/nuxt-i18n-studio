@@ -1,5 +1,6 @@
 import type { ScanContext, TracePayload } from "@ast/types";
 
+import { logger } from "@utils";
 import { parse } from "@vue/compiler-dom";
 
 import { buildPropRefs } from "./buildPropRefs";
@@ -28,5 +29,7 @@ export function visitPropChain(ctx: ScanContext, payload: TracePayload): void {
 
   try {
     tracePropUsage(parse(entry.templateContent), propRefs, payload, ctx);
-  } catch {}
+  } catch {
+    logger.warn(`Failed to parse template for component ${payload.componentName} at ${entry.filePath}.`);
+  }
 }

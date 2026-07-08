@@ -12,10 +12,10 @@ import type {
 import type { ReturnHarvestedValue } from "../../types";
 
 /**
- * Harvests prop names from a defineProps() call, supporting three forms:
- *  - defineProps<{ header: string; tagline: string }>()  — TypeScript generic (most common in <script setup lang="ts">)
- *  - defineProps({ titleKey: String, ... })               — object runtime declaration
- *  - defineProps(['titleKey', 'otherKey'])                — array runtime declaration
+ * Harvests return values from a CallExpression node, specifically handling the `defineProps` function in Vue.js.
+ * It supports both TypeScript generic forms and runtime object/array forms of `defineProps`.
+ * @param node The CallExpression node to harvest from.
+ * @returns { ReturnHarvestedValue | undefined } An array of harvested return values, or undefined if the call is not to `defineProps`.
  */
 export function harvestFromCallExpression(
   node: CallExpression,

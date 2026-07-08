@@ -1,4 +1,4 @@
-import { logger } from "@utils";
+
 import fs from "node:fs";
 import path from "node:path";
 
@@ -8,11 +8,10 @@ import type {
   TemplateVariableMap,
   PropKeyMap,
   ComponentInitialIndex,
-  PropComponentJson,
-  PropCandidate,
 } from "./types";
 
 import { PROP_MAP_FILE, PROP_MAP_ROUTE } from "./constants";
+import { loadPropMap, buildFlatIndex } from "./helper";
 import { parseSfc } from "./parseSfc";
 import { mapScriptState } from "./script/mapScriptState";
 import { mapScriptTranslations } from "./script/mapScriptTranslations";
@@ -25,86 +24,29 @@ const propKeyMap: PropKeyMap = new Map();
 const componentInitialIndex: ComponentInitialIndex = new Map();
 const propIdIndex = new Map<string, Record<string, unknown>>();
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function loadPropMap(mapPath: string): void {
-  try {
-    const raw = fs.readFileSync(mapPath, "utf-8");
-    const json = JSON.parse(raw) as PropComponentJson;
-
-    propKeyMap.clear();
-    componentInitialIndex.clear();
-    propIdIndex.clear();
-
-    for (const [componentName, props] of Object.entries(json.byComponentEnd)) {
-      const propMapEntry = new Map<
-        string,
-        { element: string; candidates: PropCandidate[] }
-      >();
-
-      for (const [propName, entry] of Object.entries(props)) {
-        propMapEntry.set(propName, entry);
-        for (const candidate of entry.candidates) {
-          propIdIndex.set(candidate.id, candidate);
-        }
-      }
-
-      propKeyMap.set(componentName, propMapEntry);
-    }
-
-    for (const [componentInitial, props] of Object.entries(
-      json.byComponentInitial,
-    )) {
-      const propMap = new Map<
-        string,
-        { propId: string; element: string; componentEnd: string }[]
-      >();
-
-      for (const [propName, entries] of Object.entries(props)) {
-        propMap.set(propName, entries);
-      }
-
-      componentInitialIndex.set(componentInitial, propMap);
-    }
-
-    const totalProps = [...propKeyMap.values()].reduce(
-      (s, m) => s + m.size,
-      0,
-    );
-    logger.log(
-      `[i18n-Studio] Loaded prop map: ${propKeyMap.size} components, ${totalProps} props, ${propIdIndex.size} ids`,
-    );
-  } catch {
-    logger.warn(
-      `[i18n-Studio] Failed to load prop map from ${mapPath}. Run 'i18n-studio analyze' to generate it.`,
-    );
-  }
-}
-
-function buildFlatIndex(): string {
-  const index: Record<string, unknown> = {};
-  for (const [id, candidate] of propIdIndex) {
-    index[id] = candidate;
-  }
-  return JSON.stringify(index);
-}
-
 // ── Plugin ────────────────────────────────────────────────────────────────────
-
+/**
+ *  Creates a Vite plugin that processes Vue files for i18n translation keys.
+ * @returns {ASTPlugin} - A Vite plugin object with hooks for build start, server configuration, bundle writing, and file transformation.
+ */
 export function ASTPlugin(): ASTPlugin {
   return {
     name: "vite-plugin-ast-i18n-studio",
     enforce: "pre",
 
     buildStart() {
-      loadPropMap(path.resolve(process.cwd(), PROP_MAP_FILE));
+      loadPropMap(path.resolve(process.cwd(), PROP_MAP_FILE),{
+        propKeyMap,
+        componentInitialIndex,
+        propIdIndex,
+      });
     },
 
     configureServer(server) {
       server.middlewares.use(PROP_MAP_ROUTE, (_req, res) => {
         res.setHeader("Content-Type", "application/json");
         res.setHeader("Cache-Control", "no-store");
-        res.end(buildFlatIndex());
+        res.end(buildFlatIndex(propIdIndex));
       });
     },
 
@@ -116,7 +58,7 @@ export function ASTPlugin(): ASTPlugin {
         }
         fs.writeFileSync(
           path.join(outDir, "prop-map.json"),
-          buildFlatIndex(),
+          buildFlatIndex(propIdIndex),
           "utf-8",
         );
       } catch {
@@ -146,7 +88,11 @@ export function ASTPlugin(): ASTPlugin {
         templateMapCache.delete(file);
       }
       if (file.endsWith("prop-map.json")) {
-        loadPropMap(file);
+        loadPropMap(file,{
+          propKeyMap,
+          componentInitialIndex,
+          propIdIndex,
+        });
       }
     },
 

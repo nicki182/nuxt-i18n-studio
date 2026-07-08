@@ -1,3 +1,4 @@
+import type { ScriptResolver } from "@ast/types";
 import type {
   CallExpression,
   ConditionalExpression,
@@ -6,11 +7,16 @@ import type {
   TemplateLiteral,
 } from "estree";
 
-import type { ScriptResolver } from "../../types";
-
+import { KeyExtractionType } from "../../constants";
 import { resolveLiteral } from "./resolveLiteral";
 import { resolveTemplateLiteral } from "./resolveTemplateLiteral";
 
+/**
+ * Resolves a CallExpression node to an array of ScriptResolver objects.
+ * @param node The CallExpression node to resolve.
+ * @param source The raw source code of the script, which may be used for context or fallback values.
+ * @returns { ScriptResolver[] } An array of ScriptResolver objects representing the resolved translation keys.
+ */
 export function resolveCallExpression(
   node: CallExpression,
   source: string,
@@ -34,41 +40,22 @@ export function resolveCallExpression(
 
   if (firstArg.type === "ConditionalExpression") {
     const cond = firstArg as ConditionalExpression;
-    const tempNodeA = {
-      ...node,
-      arguments: [cond.consequent],
-    } as CallExpression;
-    const tempNodeB = {
-      ...node,
-      arguments: [cond.alternate],
-    } as CallExpression;
-
     return [
-      ...resolveCallExpression(tempNodeA, source),
-      ...resolveCallExpression(tempNodeB, source),
+      ...resolveCallExpression({ ...node, arguments: [cond.consequent] } as CallExpression, source),
+      ...resolveCallExpression({ ...node, arguments: [cond.alternate] } as CallExpression, source),
     ];
   }
 
   if (firstArg.type === "LogicalExpression") {
     const log = firstArg as LogicalExpression;
-    const tempNodeA = {
-      ...node,
-      arguments: [log.left],
-    } as CallExpression;
-    const tempNodeB = {
-      ...node,
-      arguments: [log.right],
-    } as CallExpression;
-
     return [
-      ...resolveCallExpression(tempNodeA, source),
-      ...resolveCallExpression(tempNodeB, source),
+      ...resolveCallExpression({ ...node, arguments: [log.left] } as CallExpression, source),
+      ...resolveCallExpression({ ...node, arguments: [log.right] } as CallExpression, source),
     ];
   }
 
-  const argStart = (firstArg as any).start;
-  const argEnd = (firstArg as any).end;
-  const expr = source.slice(argStart, argEnd);
+  const { start, end } = firstArg as unknown as { start: number; end: number };
+  const expr = source.slice(start, end);
 
-  return [{ type: "dynamic", expr, id: `__EXPR__${expr}` }];
+  return [{ type: KeyExtractionType.Dynamic, expr, id: `__EXPR__${expr}` }];
 }

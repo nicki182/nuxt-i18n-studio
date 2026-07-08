@@ -3,9 +3,13 @@ import type {
   ComponentInitialIndex,
   PropKeyMap,
   ScriptVariableMap,
-  PayloadEntry
+  PayloadEntry,
 } from "@ast/types";
-import type { DirectiveNode, AttributeNode, SimpleExpressionNode } from "@vue/compiler-dom";
+import type {
+  DirectiveNode,
+  AttributeNode,
+  SimpleExpressionNode,
+} from "@vue/compiler-dom";
 
 import { KeyExtractionType } from "@ast/constants";
 import { extractKeys } from "@ast/helper";
@@ -88,7 +92,9 @@ export function transformComponentProps(
 
     for (const key of keys) {
       for (const lookupEntry of lookupEntries) {
-        const propEntry = propKeyMap.get(lookupEntry.componentEnd)?.get(propName);
+        const propEntry = propKeyMap
+          .get(lookupEntry.componentEnd)
+          ?.get(propName);
         if (!propEntry) continue;
 
         const candidate = propEntry.candidates.find(
@@ -99,8 +105,8 @@ export function transformComponentProps(
         entries.push({
           type: KeyExtractionType.Traced,
           key: candidate.key,
-          allCandidates: [{ key: candidate.key }],
-          id: `__TRACED__${propName}__${candidate.id}`,
+          allCandidates: [candidate.key], // string[] not { key: string }[]
+          id: `__TRACED__${propName}__${candidate.id}` as `__TRACED__${string}`,
           propId: candidate.id,
           element: lookupEntry.element,
           usageType: `prop:${propName}`,

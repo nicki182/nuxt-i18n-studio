@@ -1,4 +1,4 @@
-import type { ResolverMap, ScriptVariableMap, ExtractedKey } from "@ast/types";
+import type { ResolverMap, ScriptVariableMap, ExtractedKey, ResolvableNode } from "@ast/types";
 import type {
   CallExpression,
   ConditionalExpression,
@@ -27,12 +27,12 @@ const getNodeTypeResolver: ResolverMap = {
 };
 
 /**
- * Resolves an ESTree node to extract potential i18n keys, handling various node types such as literals, identifiers, conditionals, logical expressions, call expressions, and template literals. It uses a mapping of node types to specific resolver functions that implement the logic for each type. If the node type is not recognized or if the node is null/undefined, it returns an empty array.
- * @param args An object containing the node to resolve, the raw source code (for context), and a map of script variables for identifier resolution.
- * @param args.node The ESTree node to resolve, which can be of various types including Literal, Identifier, ConditionalExpression, LogicalExpression, CallExpression, TemplateLiteral, Expression, SpreadElement, or undefined/null.
- * @param args.rawSource The raw source code of the script, which may be used by resolvers for context or fallback values.
- * @param args.valueMap A map of script variables that can be used to resolve identifiers to their values.
- * @returns An array of extracted keys, where each key is an object containing the resolved value and associated metadata.
+ * Resolves a node to an array of ExtractedKey objects based on its type.
+ * @param args An object containing the node to resolve, the raw source code, and a map of script variables.
+ * @param args.node The node to resolve, which can be of various types.
+ * @param args.rawSource The raw source code of the script, which may be used for context or fallback values.
+ * @param args.valueMap A map of script variables that can be used to resolve function names to their values.
+ * @returns { ExtractedKey[] } An array of extracted keys, where each key is an object containing the resolved value and associated metadata.
  */
 export function nodeResolver(args: {
   node:
@@ -56,5 +56,9 @@ export function nodeResolver(args: {
     getNodeTypeResolver[node.type as keyof typeof getNodeTypeResolver];
   if (!resolver) return [];
 
-  return resolver(args);
+  // Cast to ResolverArgs<ResolvableNode> — safe because we've already confirmed
+  // node.type matches the resolver key, and each resolver only reads its own node type
+  return (resolver as (args: { node: ResolvableNode; rawSource: string; valueMap: ScriptVariableMap }) => ExtractedKey[])(
+    { ...args, node: node as ResolvableNode }
+  );
 }

@@ -1,3 +1,4 @@
+import type { ScriptResolver } from "@ast/types";
 import type {
   ArrowFunctionExpression,
   CallExpression,
@@ -7,12 +8,17 @@ import type {
   MemberExpression,
 } from "estree";
 
-import type { ScriptResolver } from "../../types";
-
 import { isTCall } from "../helper";
 import { resolveCallExpression } from "./resolveCallExpression";
 import { resolveFunction } from "./resolveFunction";
 
+/**
+ * Resolves an expression node to an array of ScriptResolver objects.
+ * @param args An object containing the expression node and the raw source code.
+ * @param args.node The expression node to resolve.
+ * @param args.source The raw source code of the script, which may be used for context or fallback values.
+ * @returns { ScriptResolver[] } An array of ScriptResolver objects representing the resolved translation keys.
+ */
 export function resolveExpression({
   node,
   source,

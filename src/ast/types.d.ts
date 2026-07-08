@@ -97,7 +97,8 @@ export type ScriptResolver =
       allCandidates: string[];
       id: `__TRACED__${string}`;
     }
-  | { type: KET["Direct"]; key: string; id: `__STATIC__${string}` };
+  | { type: KET["Direct"]; key: string; id: `__STATIC__${string}` }
+  | { type: KET["Prop"]; propName: string; id: `__PROP__${string}` };
 
 export type PayloadEntry = ExtractedKey & { usageType: string };
 

@@ -16,10 +16,11 @@ import { isTCall } from "../helper";
 import { resolveCallExpression } from "./resolveCallExpression";
 
 /**
- *
- * @param root0
- * @param root0.node
- * @param root0.source
+ * Resolves a function node (ArrowFunctionExpression, FunctionExpression, or FunctionDeclaration) to an array of ScriptResolver objects.
+ * @param args An object containing the function node and the raw source code.
+ * @param args.node The function node to resolve.
+ * @param args.source The raw source code of the script, which may be used for context or fallback values.
+ * @returns { ScriptResolver[] } An array of ScriptResolver objects representing the resolved translation keys.
  */
 export function resolveFunction({
   node,

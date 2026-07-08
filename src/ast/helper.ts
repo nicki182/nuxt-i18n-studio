@@ -1,16 +1,16 @@
-import type {
-  AttributeNode,
-  DirectiveNode
-} from "@vue/compiler-dom";
+import type { AttributeNode, DirectiveNode } from "@vue/compiler-dom";
 
-import { toSlug } from "@utils";
+import { toSlug, logger } from "@utils";
 import { NodeTypes } from "@vue/compiler-dom";
-import { v4 as uuidv4 } from 'uuid';
+import fs from "node:fs";
+import { v4 as uuidv4 } from "uuid";
 
 import type {
   PayloadEntry,
   ScriptVariableMap,
-  WrappableElementNode
+  WrappableElementNode,
+  PropCandidate,
+  PropComponentJson,
 } from "./types";
 
 import { extractTemplateTranslations } from "./template";
@@ -97,10 +97,9 @@ export function generateCandidateId(
   index: number,
 ): string {
   const slug = toSlug(componentName);
-  const safeProp = propName.replace(/[^a-zA-Z0-9]/g, "_");
+  const safeProp = propName.replace(/i/g, "_");
   return `${slug}__${safeProp}__${index}`;
 }
-
 
 /**
  * Extracts translation keys from a given expression using the provided script variable map.
@@ -114,19 +113,98 @@ export function extractKeys(
 ): string[] {
   const keys: string[] = [];
 
-  for (const entry of extractTemplateTranslations(
-    expression,
-    scriptVariableMap,
-  )) {
+  for (const entry of extractTemplateTranslations(expression, scriptVariableMap)) {
     if ("key" in entry && entry.key) {
       keys.push(entry.key);
     }
     if ("allCandidates" in entry) {
-      (entry.allCandidates as { key: string }[]).forEach((c) => {
-        if (c.key) keys.push(c.key);
-      });
+      for (const candidate of entry.allCandidates) {
+        if (candidate) keys.push(candidate);
+      }
     }
   }
 
   return [...new Set(keys)];
+}
+
+/**
+ * Loads a prop map from a JSON file and populates the provided maps with the data.
+ * @param mapPath - The path to the JSON file containing the prop map.
+ * @param maps - An object containing the maps to populate: propKeyMap, componentInitialIndex, and propIdIndex.
+ * @param maps.propKeyMap - A map of component names to their associated props and candidates.
+ * @param maps.componentInitialIndex - An index of initial component prop IDs for quick lookup.
+ * @param maps.propIdIndex - A map of prop IDs to their associated candidates.
+ * @returns {void}
+ */
+export function loadPropMap(
+  mapPath: string,
+  maps: {
+    propKeyMap: Map<
+      string,
+      Map<string, { element: string; candidates: PropCandidate[] }>
+    >;
+    componentInitialIndex: Map<
+      string,
+      Map<string, { propId: string; element: string; componentEnd: string }[]>
+    >;
+    propIdIndex: Map<string, unknown>;
+  },
+): void {
+  try {
+    const { propKeyMap, componentInitialIndex, propIdIndex } = maps;
+    const raw = fs.readFileSync(mapPath, "utf-8");
+    const json = JSON.parse(raw) as PropComponentJson;
+
+    propKeyMap.clear();
+    componentInitialIndex.clear();
+    propIdIndex.clear();
+
+    for (const [componentName, props] of Object.entries(json.byComponentEnd)) {
+      const propMapEntry = new Map<
+        string,
+        { element: string; candidates: PropCandidate[] }
+      >();
+
+      for (const [propName, entry] of Object.entries(props)) {
+        propMapEntry.set(propName, entry);
+        for (const candidate of entry.candidates) {
+          propIdIndex.set(candidate.id, candidate);
+        }
+      }
+
+      propKeyMap.set(componentName, propMapEntry);
+    }
+
+    for (const [componentInitial, props] of Object.entries(
+      json.byComponentInitial,
+    )) {
+      const propMap = new Map<
+        string,
+        { propId: string; element: string; componentEnd: string }[]
+      >();
+
+      for (const [propName, entries] of Object.entries(props)) {
+        propMap.set(propName, entries);
+      }
+
+      componentInitialIndex.set(componentInitial, propMap);
+    }
+
+    const totalProps = [...propKeyMap.values()].reduce((s, m) => s + m.size, 0);
+    logger.log(
+      `[i18n-Studio] Loaded prop map: ${propKeyMap.size} components, ${totalProps} props, ${propIdIndex.size} ids`,
+    );
+  } catch {
+    logger.warn(
+      `[i18n-Studio] Failed to load prop map from ${mapPath}. Run 'i18n-studio analyze' to generate it.`,
+    );
+  }
+}
+
+export function buildFlatIndex(indexes: Map<string, unknown>): string {
+  const index: Record<string, unknown> = {};
+  for (const [id, candidate] of indexes) {
+    index[id] = candidate;
+  }
+  return JSON.stringify(index);
 }

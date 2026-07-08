@@ -5,12 +5,11 @@ import type { ScriptResolver } from "../../types";
 import { resolveExpression } from "./resolveExpression";
 
 /**
- * Resolves an assignment expression (e.g., greeting = t('home'))
- * Passes the right side of the assignment to the expression evaluator.
- *
- * @param root0
- * @param root0.node
- * @param root0.source
+ * Resolves an AssignmentExpression node to an array of ScriptResolver objects.
+ * @param args An object containing the AssignmentExpression node and the raw source code.
+ * @param args.node The AssignmentExpression node to resolve.
+ * @param args.source The raw source code of the script, which may be used for context or fallback values.
+ * @returns { ScriptResolver[] } An array of ScriptResolver objects representing the resolved translation keys.
  */
 export function resolveAssignmentExpression({
   node,
