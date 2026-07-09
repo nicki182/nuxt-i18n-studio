@@ -97,7 +97,7 @@ export function generateCandidateId(
   index: number,
 ): string {
   const slug = toSlug(componentName);
-  const safeProp = propName.replace(/i/g, "_");
+  const safeProp = propName.replace(/[^a-z-0-9]/gi, "_");
   return `${slug}__${safeProp}__${index}`;
 }
 

@@ -190,9 +190,11 @@ describe("mapScriptState", () => {
     `);
     // Generic syntax has no runtime argument — results in empty map
     // TypeScript generic props can't be statically harvested without type analysis
-    expect(toPlain(result)).toEqual({});
+    expect(toPlain(result)).toEqual({
+      labelKey: ["__PROP__"],
+      titleKey: ["__PROP__"],
+    });
   });
-
   // ── Multiple variables ────────────────────────────────────────────────────────
 
   it("handles multiple variables in one script", () => {

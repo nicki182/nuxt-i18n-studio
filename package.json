@@ -106,6 +106,7 @@
     "@nuxt/test-utils": "^4.0.2",
     "@types/estree": "^1.0.9",
     "@types/node": "latest",
+    "@vitest/coverage-v8": "4.1.4",
     "changelogen": "^0.6.2",
     "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
