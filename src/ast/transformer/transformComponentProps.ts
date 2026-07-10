@@ -13,6 +13,7 @@ import type {
 
 import { KeyExtractionType } from "@ast/constants";
 import { extractKeys } from "@ast/helper";
+import { toPascalCase } from "@utils";
 import { NodeTypes } from "@vue/compiler-dom";
 
 /**
@@ -66,7 +67,7 @@ export function transformComponentProps(
   }
 
   // Phase 4: Component Usage Mapping
-  const initialPropMap = componentInitialIndex.get(el.tag);
+  const initialPropMap = componentInitialIndex.get(toPascalCase(el.tag));
   if (!initialPropMap) return entries;
 
   for (const propNode of el.props) {

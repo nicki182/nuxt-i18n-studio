@@ -16,7 +16,7 @@ export type KeyExtractionType =
 // Usage: <p data-i18n-keys="home.key.one,home.key.two">{{ $t(dynamicKey) }}</p>
 export const DECLARED_KEYS_ATTR = "data-i18n-keys";
 
-export const BARE_IDENTIFIER_RE = /^\s*([i_$][\w$]*)\s*$/;
+export const BARE_IDENTIFIER_RE = /^\s*([a-z_$][\w$]*)\s*$/i;
 
 // Native HTML element attributes that can contain translatable text.
 // Used in transformTemplateElement to decide which :attr="$t(...)" bindings

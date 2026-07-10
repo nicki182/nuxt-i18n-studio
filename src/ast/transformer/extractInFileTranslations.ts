@@ -36,7 +36,6 @@ export function extractInFileTranslations(
     source.includes("$t") || source.includes(" t(") || source.includes("(t(");
   const hasDeclaredKeys = source.includes(DECLARED_KEYS_ATTR);
   const hasTemplateRef = hasTemplateVariableRef(el, templateVariableMap);
-
   if (!hasTCall && !hasDeclaredKeys && !hasTemplateRef) return entries;
 
   // ── Phase 2: Interpolations ───────────────────────────────────────────────
