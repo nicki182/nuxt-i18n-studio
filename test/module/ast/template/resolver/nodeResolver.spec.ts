@@ -1,3 +1,4 @@
+import type { ScriptVariableMap } from "@ast/types";
 import type {
   Node,
   Literal,
@@ -8,11 +9,8 @@ import type {
   CallExpression,
 } from "estree";
 
+import { nodeResolver } from "@ast/template/resolver";
 import { describe, it, expect } from "vitest";
-
-import type { ScriptVariableMap } from "../../../../src/ast/types";
-
-import { nodeResolver } from "../../../../src/ast/template/resolver/nodeResolver";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
