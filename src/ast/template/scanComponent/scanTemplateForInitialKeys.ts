@@ -1,26 +1,28 @@
-import type { ElementCacheEntry, ScanContext } from "@ast/types";
+import type { ElementCacheEntry, PropCandidate, ScanContext } from "@ast/types";
 
-import {
-  extractKeys,
-} from "@ast/helper";
+import { extractKeys } from "@ast/helper";
 import { logger, toPascalCase } from "@utils";
 import { parse } from "@vue/compiler-dom";
 
-import { isElementNode,isDirectiveNode,hasChildren } from "./helper";
+import { isElementNode, isDirectiveNode, hasChildren } from "./helper";
 import { visitPropChain } from "./visitPropChains";
+
 /**
  * Recursively scans a Vue template AST node for initial translation keys.
+ * Returns all matched candidates without writing to any map.
  * @param node - The current AST node to scan.
  * @param fileEntry - The cache entry for the current file being scanned.
- * @param ctx - The scanning context containing state and mappings.
+ * @param ctx - The scanning context (used for lookups and visited tracking only).
+ * @returns {PropCandidate[]} - All candidates found in this subtree.
  */
 export function scanTemplateForInitialKeys(
   node: unknown,
   fileEntry: ElementCacheEntry,
   ctx: ScanContext,
-): void {
+): PropCandidate[] {
+  const results: PropCandidate[] = [];
+
   if (isElementNode(node) && node.tagType === 1 && node.tag) {
-    // Convert the template tag to PascalCase to match our registry
     const componentName = toPascalCase(node.tag);
 
     // 1. Check bound component props for $t() usage
@@ -39,27 +41,31 @@ export function scanTemplateForInitialKeys(
 
       const keys = extractKeys(expression, fileEntry.scriptVariableMap);
       for (const key of keys) {
-        visitPropChain(ctx, {
-          key,
-          sourcePath: fileEntry.filePath,
-          componentInitial: componentName,
-          componentName: componentName,
-          propName,
-        });
+        results.push(
+          ...visitPropChain(ctx, {
+            key,
+            sourcePath: fileEntry.filePath,
+            componentInitial: componentName,
+            componentName,
+            propName,
+          }),
+        );
       }
     }
 
-    // 2. Recurse into the child component's template using the normalized name
+    // 2. Recurse into the child component's template
     const childEntry = ctx.byComponentName.get(componentName);
     if (childEntry?.templateContent) {
       const visitedCompHash = `__comp__${componentName}`;
       if (!ctx.visited.has(visitedCompHash)) {
         ctx.visited.add(visitedCompHash);
         try {
-          scanTemplateForInitialKeys(
-            parse(childEntry.templateContent),
-            childEntry,
-            ctx,
+          results.push(
+            ...scanTemplateForInitialKeys(
+              parse(childEntry.templateContent),
+              childEntry,
+              ctx,
+            ),
           );
         } catch {
           logger.warn(
@@ -71,8 +77,10 @@ export function scanTemplateForInitialKeys(
   }
 
   if (hasChildren(node)) {
-    node.children.forEach((child) =>
-      scanTemplateForInitialKeys(child, fileEntry, ctx),
-    );
+    for (const child of node.children) {
+      results.push(...scanTemplateForInitialKeys(child, fileEntry, ctx));
+    }
   }
+
+  return results;
 }

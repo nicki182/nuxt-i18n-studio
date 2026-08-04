@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { harvestFromAssignmentExpression } from "../../../../src/ast/script/harvest/harvestFromAssignmentExpression";
+import { harvestFromAssignmentExpression } from "../../../../../src/ast/script/harvest/harvestFromAssignmentExpression";
 import {
   mockIdentifier,
   mockLiteral,
   mockMemberExpression,
   mockAssignment,
-} from "../mocks";
+} from "../../mocks";
 
 // ── harvestFromAssignmentExpression ───────────────────────────────────────────
 

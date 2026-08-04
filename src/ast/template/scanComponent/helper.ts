@@ -1,7 +1,4 @@
-import type {
-  PropCandidate,
-  PropKeyMap,
-} from "@ast/types";
+import type { PropCandidate, PropKeyMap } from "@ast/types";
 import type {
   ElementNode,
   InterpolationNode,
@@ -27,13 +24,13 @@ export function isElementNode(node: unknown): node is ElementNode {
 }
 
 /**
- * Record a candidate for a given component and prop in the propKeyMap.
- * @param propKeyMap - The map storing component names and their associated props and candidates.
- * @param componentName - The name of the component.
- * @param propName - The name of the prop.
- * @param candidate - The candidate to record, containing key, path, and element information.
+ * Applies a candidate to the propKeyMap. Only called from buildPropKeyMap — the single writer.
+ * @param propKeyMap - The map to write into.
+ * @param componentName - The component to record under.
+ * @param propName - The prop to record under.
+ * @param candidate - The candidate to apply.
  */
-export function recordCandidate(
+export function applyCandidate(
   propKeyMap: PropKeyMap,
   componentName: string,
   propName: string,
@@ -69,7 +66,10 @@ export function recordCandidate(
  * @param propName - The name of the prop to look for.
  * @returns {boolean} - True if the node references the prop, false otherwise.
  */
-export function referencesPropsAccess(node: unknown, propName: string): boolean {
+export function referencesPropsAccess(
+  node: unknown,
+  propName: string,
+): boolean {
   if (!node || typeof node !== "object") return false;
   const n = node as Record<string, unknown>;
 
@@ -108,7 +108,7 @@ export function isInterpolationNode(node: unknown): node is InterpolationNode {
   return (
     !!node &&
     typeof node === "object" &&
-    (node as any).type === NodeTypes.INTERPOLATION
+    (node as InterpolationNode).type === NodeTypes.INTERPOLATION
   );
 }
 
@@ -121,7 +121,9 @@ export function hasChildren(
   node: unknown,
 ): node is { children: TemplateChildNode[] } {
   return (
-    !!node && typeof node === "object" && Array.isArray((node as any).children)
+    !!node &&
+    typeof node === "object" &&
+    Array.isArray((node as { children?: TemplateChildNode[] }).children)
   );
 }
 
@@ -130,15 +132,13 @@ export function hasChildren(
  * @param node - The node to check.
  * @returns {boolean} - True if the node is a DirectiveNode, false otherwise.
  */
-export function isDirectiveNode(
-  node: unknown,
-): node is DirectiveNode & {
+export function isDirectiveNode(node: unknown): node is DirectiveNode & {
   arg?: SimpleExpressionNode;
   exp?: SimpleExpressionNode;
 } {
   return (
     !!node &&
     typeof node === "object" &&
-    (node as any).type === NodeTypes.DIRECTIVE
+    (node as DirectiveNode).type === NodeTypes.DIRECTIVE
   );
 }

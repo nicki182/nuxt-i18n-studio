@@ -2,7 +2,7 @@ import type { ArrowFunctionExpression } from "estree";
 
 import { describe, it, expect } from "vitest";
 
-import { harvestFunctionReturns } from "../../../../src/ast/script/harvest/harvestFromFunctionReturns";
+import { harvestFunctionReturns } from "../../../../../src/ast/script/harvest/harvestFromFunctionReturns";
 import {
   mockArrowBlock,
   mockArrowImplicit,
@@ -12,7 +12,7 @@ import {
   mockFunctionExpression,
   mockFunctionDeclaration,
   mockBlockStatement,
-} from "../mocks";
+} from "../../mocks";
 
 // ── harvestFunctionReturns ────────────────────────────────────────────────────
 

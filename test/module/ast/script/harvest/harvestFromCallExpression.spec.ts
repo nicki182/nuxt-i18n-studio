@@ -2,7 +2,7 @@ import type { CallExpression, SpreadElement } from "estree";
 
 import { describe, it, expect } from "vitest";
 
-import { harvestFromCallExpression } from "../../../../src/ast/script/harvest/harvestFromCallExpression";
+import { harvestFromCallExpression } from "../../../../../src/ast/script/harvest/harvestFromCallExpression";
 import {
   mockArrayExpression,
   mockOtherCall,
@@ -11,7 +11,7 @@ import {
   mockDefinePropsCall,
   mockLiteral,
   mockProperty,
-} from "../mocks";
+} from "../../mocks";
 
 // ── harvestFromCallExpression ─────────────────────────────────────────────────
 
