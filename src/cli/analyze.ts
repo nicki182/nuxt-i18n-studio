@@ -52,7 +52,7 @@ export function runAnalyze(options: { root: string; output: string }): void {
 
   const { jsonReport, metrics } = analyzeProject(rawInputFiles, entryFilePaths);
 
-  logger.log(`   Mapped ${metrics.totalProps} prop(s) across ${metrics.componentCount} component(s)`);
+  logger.log(`   Mapped ${metrics.totalProps} propd(s) across ${metrics.componentCount} component(s)`);
   logger.log(`   Resolved ${metrics.totalCandidates} total candidate(s)`);
 
   const outputPath = path.resolve(root, output);

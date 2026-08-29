@@ -11,7 +11,7 @@ import { referencesPropsAccess } from "./helper";
  * @param propName - The name of the property to build references for.
  * @param scriptVariableMap - A map of script variables and their associated values.
  * @param scriptCode - The source code of the script to analyze.
- * @returns {Set<string>} - A set of property references that include the original prop name and any variables referencing it.
+ * @returns {Set<string>} - A set of property references that include the original prop name, its `props.` accessors, and any variables referencing it.
  */
 export function buildPropRefs(
   propName: string,
@@ -26,7 +26,14 @@ export function buildPropRefs(
     refs.add(propName);
   }
 
-  // Walk script AST to find vars that reference props.{propName}
+  // Templates may consume the prop via the props object: {{ props.text }}.
+  // Add accessor forms whenever the script declares props via defineProps.
+  if (/defineProps\s*[<(]/.test(scriptCode)) {
+    refs.add(`props.${propName}`);
+    refs.add(`props?.${propName}`);
+  }
+
+  // Walk script AST to find vars that reference props.{propName} anywhere
   try {
     const ast = TSParser.parse(scriptCode, {
       ecmaVersion: "latest",

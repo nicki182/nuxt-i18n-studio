@@ -33,6 +33,7 @@ export const TRANSLATABLE_ATTRS = [
   "content",
   "tooltip",
   "helper-text",
+  "text"
 ] as const;
 
 export type TranslatableAttr = (typeof TRANSLATABLE_ATTRS)[number];

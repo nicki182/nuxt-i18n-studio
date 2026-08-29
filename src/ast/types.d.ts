@@ -68,37 +68,37 @@ export type HarvesterMap = {
 // ── Template extraction ───────────────────────────────────────────────────────
 
 // Derive literal types from the const object values
-type KET = typeof KeyExtractionType;
+type KEY_TYPE = typeof KeyExtractionType;
 
 export type ExtractedKey =
-  | { type: KET["Static"]; key: string; id: `__STATIC__${string}` }
+  | { type: KEY_TYPE["Static"]; key: string; id: `__STATIC__${string}` }
   | {
-      type: KET["Traced"];
+      type: KEY_TYPE["Traced"];
       key: string;
       allCandidates: string[];
       id: `__TRACED__${string}`;
     }
-  | { type: KET["Prop"]; propName: string; id: `__PROP__${string}` }
+  | { type: KEY_TYPE["Prop"]; propName: string; id: `__PROP__${string}` }
   | {
-      type: KET["Dynamic"];
+      type: KEY_TYPE["Dynamic"];
       expr: string;
       candidates: string[];
       id: `__EXPR__${string}`;
     }
-  | { type: KET["Prefix"]; prefix: string; id: `__PREFIX__${string}` };
+  | { type: KEY_TYPE["Prefix"]; prefix: string; id: `__PREFIX__${string}` };
 
 export type ScriptResolver =
-  | { type: KET["Static"]; key: string; id: `__STATIC__${string}` }
-  | { type: KET["Prefix"]; prefix: string; id: `__PREFIX__${string}` }
-  | { type: KET["Dynamic"]; expr: string; id: `__EXPR__${string}` }
+  | { type: KEY_TYPE["Static"]; key: string; id: `__STATIC__${string}` }
+  | { type: KEY_TYPE["Prefix"]; prefix: string; id: `__PREFIX__${string}` }
+  | { type: KEY_TYPE["Dynamic"]; expr: string; id: `__EXPR__${string}` }
   | {
-      type: KET["Traced"];
+      type: KEY_TYPE["Traced"];
       key: string;
       allCandidates: string[];
       id: `__TRACED__${string}`;
     }
-  | { type: KET["Direct"]; key: string; id: `__STATIC__${string}` }
-  | { type: KET["Prop"]; propName: string; id: `__PROP__${string}` };
+  | { type: KEY_TYPE["Direct"]; key: string; id: `__STATIC__${string}` }
+  | { type: KEY_TYPE["Prop"]; propName: string; id: `__PROP__${string}` };
 
 export type PayloadEntry = ExtractedKey & { usageType: string };
 

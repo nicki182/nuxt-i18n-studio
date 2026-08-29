@@ -1,13 +1,19 @@
 import type { ElementCacheEntry, PropKeyMap, ScanContext } from "@ast/types";
 
-import { parse } from "@vue/compiler-dom";
-
+import { buildComponentTree } from "./buildComponentTree";
 import { applyCandidate } from "./helper";
-import { scanTemplateForInitialKeys } from "./scanTemplateForInitialKeys";
+import { verifyComponentTree } from "./verifyComponentTree";
 
 /**
  * Builds a property key map by scanning the provided file cache and entry file paths.
  * This is the only function that writes to propKeyMap — all inner functions return data.
+ *
+ * Pipeline per entry file:
+ * 1. buildComponentTree — materialize the component tree, one layer per nested component.
+ * 2. verifyComponentTree — verify each layer for key-carrying props; the existing
+ *    chain analysis (visitPropChain) runs only at layers where a prop is sent.
+ * 3. applyCandidate — single write site into the map.
+ *
  * @param fileCache - An array of ElementCacheEntry objects representing the cached files.
  * @param entryFilePaths - An array of file paths to initiate the scanning process.
  * @returns {PropKeyMap} - A map containing component names, their associated props, and candidates.
@@ -32,17 +38,14 @@ export function buildPropKeyMap(
     }
   }
 
-  // 2. Walk entry files, collect candidates, and apply them — single write site
+  // 2. Walk entry files: build each tree, verify layer by layer, apply candidates
   for (const filePath of entryFilePaths) {
     const entry = ctx.byFilePath.get(filePath);
     if (!entry?.templateContent) continue;
 
     try {
-      const candidates = scanTemplateForInitialKeys(
-        parse(entry.templateContent),
-        entry,
-        ctx,
-      );
+      const tree = buildComponentTree(entry, ctx);
+      const candidates = verifyComponentTree(tree, ctx);
 
       for (const candidate of candidates) {
         applyCandidate(
